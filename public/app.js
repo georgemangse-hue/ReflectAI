@@ -1223,6 +1223,11 @@ if ('serviceWorker' in navigator) {
 let _pwaPrompt = null;
 const PWA_DISMISSED_KEY = 'reflectai_pwa_dismissed';
 
+const _isIOS        = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const _isAndroid    = /android/i.test(navigator.userAgent);
+const _isStandalone = window.matchMedia('(display-mode: standalone)').matches
+                      || window.navigator.standalone === true;
+
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   _pwaPrompt = e;
@@ -1235,11 +1240,28 @@ window.addEventListener('appinstalled', () => {
 });
 
 function maybeShowPwaBanner() {
-  if (!_pwaPrompt) return;
+  // Don't show if already installed, already dismissed, or on desktop
+  if (_isStandalone) return;
   if (localStorage.getItem(PWA_DISMISSED_KEY)) return;
+  if (!_isIOS && !_isAndroid) return;
+
   setTimeout(() => {
-    if (_pwaPrompt) document.getElementById('pwa-banner')?.classList.remove('hidden');
-  }, 45000);
+    if (_isStandalone) return;
+    const banner = document.getElementById('pwa-banner');
+    const hint   = document.getElementById('pwa-banner-hint');
+    if (!banner) return;
+
+    // iOS Safari: no beforeinstallprompt — show manual instructions
+    if (_isIOS && hint) {
+      hint.textContent = 'Tap the Share button ↑ then "Add to Home Screen"';
+    }
+    // Android without native prompt: show manual instructions
+    if (_isAndroid && !_pwaPrompt && hint) {
+      hint.textContent = 'Tap ⋮ in Chrome then "Add to Home Screen"';
+    }
+
+    banner.classList.remove('hidden');
+  }, 20000); // 20 s — enough time to log in and read an entry
 }
 
 function dismissPwaBanner() {
@@ -1248,12 +1270,17 @@ function dismissPwaBanner() {
 }
 
 async function triggerPwaInstall() {
-  if (!_pwaPrompt) return;
-  _pwaPrompt.prompt();
-  const { outcome } = await _pwaPrompt.userChoice;
-  _pwaPrompt = null;
-  document.getElementById('pwa-banner')?.classList.add('hidden');
-  if (outcome === 'accepted') showToast('ReflectAI added to your home screen!');
+  if (_pwaPrompt) {
+    // Android Chrome — native prompt available
+    _pwaPrompt.prompt();
+    const { outcome } = await _pwaPrompt.userChoice;
+    _pwaPrompt = null;
+    document.getElementById('pwa-banner')?.classList.add('hidden');
+    if (outcome === 'accepted') showToast('ReflectAI added to your home screen!');
+  } else {
+    // iOS / other — just dismiss; hint text already guides them
+    dismissPwaBanner();
+  }
 }
 
 
