@@ -58,7 +58,7 @@ function checkDemoRate(ip) {
 }
 const PUBLIC              = path.join(__dirname, 'public');
 
-const DATA_DIR       = path.join(__dirname, 'data');
+const DATA_DIR       = process.env.DATA_DIR || path.join(__dirname, 'data');
 const USERS_FILE     = path.join(DATA_DIR, 'users.json');
 const SESSIONS_FILE  = path.join(DATA_DIR, 'sessions.json');
 const ENTRIES_DIR    = path.join(DATA_DIR, 'entries');
@@ -393,6 +393,10 @@ const VALID_MOODS = ['motivated', 'happy', 'grateful', 'tired', 'anxious', 'sad'
 const server = http.createServer(async (req, res) => {
   const url    = req.url.split('?')[0];
   const method = req.method.toUpperCase();
+
+  res.on('finish', () => {
+    if (res.statusCode >= 400) console.error(`${res.statusCode} ${method} ${req.url}`);
+  });
 
   res.setHeader('Access-Control-Allow-Origin',  '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
