@@ -58,11 +58,12 @@ function checkDemoRate(ip) {
 }
 const PUBLIC              = path.join(__dirname, 'public');
 
-const DATA_DIR      = path.join(__dirname, 'data');
-const USERS_FILE    = path.join(DATA_DIR, 'users.json');
-const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
-const ENTRIES_DIR   = path.join(DATA_DIR, 'entries');
-const GOALS_DIR     = path.join(DATA_DIR, 'goals');
+const DATA_DIR       = path.join(__dirname, 'data');
+const USERS_FILE     = path.join(DATA_DIR, 'users.json');
+const SESSIONS_FILE  = path.join(DATA_DIR, 'sessions.json');
+const ENTRIES_DIR    = path.join(DATA_DIR, 'entries');
+const GOALS_DIR      = path.join(DATA_DIR, 'goals');
+const FEEDBACK_FILE  = path.join(DATA_DIR, 'feedback.json');
 
 /* ================================================================
    Bootstrap
@@ -72,6 +73,7 @@ const GOALS_DIR     = path.join(DATA_DIR, 'goals');
 });
 if (!fs.existsSync(USERS_FILE))    fs.writeFileSync(USERS_FILE,    '[]');
 if (!fs.existsSync(SESSIONS_FILE)) fs.writeFileSync(SESSIONS_FILE, '[]');
+if (!fs.existsSync(FEEDBACK_FILE)) fs.writeFileSync(FEEDBACK_FILE, '[]');
 
 /* ================================================================
    JSON helpers
@@ -764,6 +766,55 @@ const server = http.createServer(async (req, res) => {
       }
 
       res.writeHead(200); return res.end('OK');
+    }
+
+    /* ==============================================================
+       FEEDBACK
+    ============================================================== */
+    if (method === 'POST' && url === '/api/feedback') {
+      const user = requireAuth(req, res);
+      if (!user) return;
+      const { likes, improve, wouldPay } = await readBody(req);
+
+      const VALID_PAY = ['yes', 'no', 'maybe'];
+      const likesText   = (likes   || '').trim().slice(0, 2000);
+      const improveText = (improve || '').trim().slice(0, 2000);
+      const payVal      = VALID_PAY.includes(wouldPay) ? wouldPay : null;
+
+      if (!likesText && !improveText && !payVal)
+        return sendJSON(res, 400, { error: 'Please answer at least one question.' });
+
+      const all      = readJSON(FEEDBACK_FILE);
+      const existing = all.findIndex(f => f.userId === user.id);
+      const entry    = {
+        id:        existing !== -1 ? all[existing].id : generateId(),
+        userId:    user.id,
+        email:     user.email,
+        likes:     likesText,
+        improve:   improveText,
+        wouldPay:  payVal,
+        createdAt: existing !== -1 ? all[existing].createdAt : Date.now(),
+        updatedAt: Date.now()
+      };
+      if (existing !== -1) all[existing] = entry; else all.push(entry);
+      writeJSON(FEEDBACK_FILE, all);
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    if (method === 'GET' && url === '/api/admin/feedback') {
+      if (!requireAdmin(req, res)) return;
+      const all  = readJSON(FEEDBACK_FILE);
+      const list = [...all].sort((a, b) => b.createdAt - a.createdAt);
+      return sendJSON(res, 200, {
+        feedback: list,
+        stats: {
+          total: all.length,
+          yes:   all.filter(f => f.wouldPay === 'yes').length,
+          no:    all.filter(f => f.wouldPay === 'no').length,
+          maybe: all.filter(f => f.wouldPay === 'maybe').length,
+          unanswered: all.filter(f => !f.wouldPay).length
+        }
+      });
     }
 
     /* ==============================================================

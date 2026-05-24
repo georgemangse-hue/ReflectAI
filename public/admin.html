@@ -35,6 +35,14 @@
     .content { padding: 1.75rem 1.75rem 3rem; max-width: 1200px; width: 100%; margin: 0 auto; }
     .page-title { font-size: 1.5rem; font-weight: 800; color: #fff; margin-bottom: 1.5rem; }
 
+    /* ── Tabs ───────────────────────────────────────── */
+    .tabs { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 1px solid #30363d; }
+    .tab-btn { padding: 0.6rem 1.25rem; background: none; border: none; border-bottom: 2px solid transparent; color: #8b949e; font-size: 0.88rem; font-weight: 600; cursor: pointer; margin-bottom: -1px; transition: color 0.12s, border-color 0.12s; }
+    .tab-btn:hover { color: #e2e8f0; }
+    .tab-btn.active { color: #4dba7e; border-bottom-color: #4dba7e; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
     /* ── Stats cards ────────────────────────────────── */
     .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.9rem; margin-bottom: 1.75rem; }
     .stat-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 1.2rem 1rem; }
@@ -71,6 +79,8 @@
     .b-free     { background: rgba(139,148,158,0.12); color: #8b949e; }
 
     .no-data { padding: 3rem; text-align: center; color: #8b949e; font-size: 0.88rem; }
+    .td-long { max-width: 260px; white-space: normal; line-height: 1.45; font-size: 0.8rem; }
+    .fb-full { white-space: pre-wrap; }
 
     @media (max-width: 640px) {
       .topbar, .content { padding-left: 1rem; padding-right: 1rem; }
@@ -110,55 +120,105 @@
     </header>
 
     <main class="content">
-      <h1 class="page-title">Users &amp; Subscriptions</h1>
+      <h1 class="page-title">Admin Dashboard</h1>
 
-      <div class="stats-row">
-        <div class="stat-card">
-          <div class="stat-label">Total Users</div>
-          <div class="stat-val" id="s-total">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Active Subs</div>
-          <div class="stat-val c-green" id="s-active">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Cancelling</div>
-          <div class="stat-val c-yellow" id="s-cancel">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Expired</div>
-          <div class="stat-val c-red" id="s-expired">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Free (unpaid)</div>
-          <div class="stat-val c-muted" id="s-free">—</div>
-        </div>
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('users')">Users &amp; Subs</button>
+        <button class="tab-btn"        onclick="switchTab('feedback')">Feedback</button>
       </div>
 
-      <div class="table-card">
-        <div class="table-toolbar">
-          <div class="table-toolbar-left">
-            <span class="table-heading">All Users</span>
-            <span class="table-count-pill" id="tbl-count"></span>
+      <!-- ── Users tab ───────────────────────────────── -->
+      <div class="tab-panel active" id="tab-users">
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-label">Total Users</div>
+            <div class="stat-val" id="s-total">—</div>
           </div>
-          <input class="search-input" id="search" placeholder="Search email…" oninput="filter()" />
+          <div class="stat-card">
+            <div class="stat-label">Active Subs</div>
+            <div class="stat-val c-green" id="s-active">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Cancelling</div>
+            <div class="stat-val c-yellow" id="s-cancel">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Expired</div>
+            <div class="stat-val c-red" id="s-expired">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Free (unpaid)</div>
+            <div class="stat-val c-muted" id="s-free">—</div>
+          </div>
         </div>
-        <div class="table-wrap">
-          <div id="tbl-body"><div class="no-data">Loading…</div></div>
+
+        <div class="table-card">
+          <div class="table-toolbar">
+            <div class="table-toolbar-left">
+              <span class="table-heading">All Users</span>
+              <span class="table-count-pill" id="tbl-count"></span>
+            </div>
+            <input class="search-input" id="search" placeholder="Search email…" oninput="filter()" />
+          </div>
+          <div class="table-wrap">
+            <div id="tbl-body"><div class="no-data">Loading…</div></div>
+          </div>
         </div>
       </div>
+
+      <!-- ── Feedback tab ─────────────────────────────── -->
+      <div class="tab-panel" id="tab-feedback">
+        <div class="stats-row" style="max-width:600px">
+          <div class="stat-card">
+            <div class="stat-label">Responses</div>
+            <div class="stat-val" id="fb-total">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Would Pay — Yes</div>
+            <div class="stat-val c-green" id="fb-yes">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Maybe</div>
+            <div class="stat-val c-yellow" id="fb-maybe">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">No</div>
+            <div class="stat-val c-red" id="fb-no">—</div>
+          </div>
+        </div>
+
+        <div class="table-card">
+          <div class="table-toolbar">
+            <div class="table-toolbar-left">
+              <span class="table-heading">Feedback Responses</span>
+              <span class="table-count-pill" id="fb-count"></span>
+            </div>
+          </div>
+          <div id="fb-body"><div class="no-data">Loading…</div></div>
+        </div>
+      </div>
+
     </main>
   </div>
 
 
   <script>
-    let allUsers = [];
+    let allUsers    = [];
+    let allFeedback = [];
 
     /* ── Helpers ───────────────────────────────────── */
     const $ = id => document.getElementById(id);
     const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const key = () => sessionStorage.getItem('ra_admin') || '';
     const fmtDate = ts => ts ? new Date(ts).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+
+    /* ── Tabs ──────────────────────────────────────── */
+    function switchTab(name) {
+      document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', ['users','feedback'][i] === name));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      $('tab-' + name).classList.add('active');
+      if (name === 'feedback' && allFeedback.length === 0) loadFeedback();
+    }
 
     function statusBadge(u) {
       const now = Date.now();
@@ -174,6 +234,61 @@
       const res = await fetch('/api/admin/users', { headers: { Authorization: 'Bearer ' + key() } });
       if (!res.ok) throw new Error(res.status === 401 ? 'bad_key' : 'fetch_fail');
       return res.json();
+    }
+
+    async function loadFeedback() {
+      $('fb-body').innerHTML = '<div class="no-data">Loading…</div>';
+      try {
+        const res  = await fetch('/api/admin/feedback', { headers: { Authorization: 'Bearer ' + key() } });
+        const data = await res.json();
+        allFeedback = data.feedback || [];
+        const s = data.stats || {};
+        $('fb-total').textContent = s.total ?? 0;
+        $('fb-yes').textContent   = s.yes   ?? 0;
+        $('fb-maybe').textContent = s.maybe ?? 0;
+        $('fb-no').textContent    = s.no    ?? 0;
+        renderFeedback(allFeedback);
+      } catch { $('fb-body').innerHTML = '<div class="no-data">Failed to load feedback.</div>'; }
+    }
+
+    function payBadge(val) {
+      if (val === 'yes')   return `<span class="badge b-active">👍 Yes</span>`;
+      if (val === 'maybe') return `<span class="badge b-cancel">🤔 Maybe</span>`;
+      if (val === 'no')    return `<span class="badge b-expired">👎 No</span>`;
+      return `<span class="badge b-free">—</span>`;
+    }
+
+    function renderFeedback(list) {
+      $('fb-count').textContent = list.length + ' response' + (list.length !== 1 ? 's' : '');
+      if (!list.length) { $('fb-body').innerHTML = '<div class="no-data">No feedback yet.</div>'; return; }
+      $('fb-body').innerHTML = `
+        <table>
+          <thead><tr>
+            <th>Email</th>
+            <th>Likes</th>
+            <th>Would Improve</th>
+            <th>Would Pay?</th>
+            <th>Date</th>
+          </tr></thead>
+          <tbody>
+            ${list.map(f => `
+              <tr style="cursor:pointer;vertical-align:top" onclick="this.classList.toggle('fb-open')">
+                <td class="td-email">${esc(f.email)}</td>
+                <td class="td-long">${f.likes   ? `<span class="fb-short">${esc(f.likes.slice(0,60))}${f.likes.length > 60 ? '…' : ''}</span><span class="fb-full" style="display:none">${esc(f.likes)}</span>` : '<span style="color:#8b949e">—</span>'}</td>
+                <td class="td-long">${f.improve ? `<span class="fb-short">${esc(f.improve.slice(0,60))}${f.improve.length > 60 ? '…' : ''}</span><span class="fb-full" style="display:none">${esc(f.improve)}</span>` : '<span style="color:#8b949e">—</span>'}</td>
+                <td>${payBadge(f.wouldPay)}</td>
+                <td>${fmtDate(f.createdAt)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+
+      // Toggle full text on row click
+      $('fb-body').querySelectorAll('tbody tr').forEach(row => {
+        row.addEventListener('click', () => {
+          row.querySelectorAll('.fb-short').forEach(el => el.style.display = row.classList.contains('fb-open') ? 'none' : '');
+          row.querySelectorAll('.fb-full').forEach(el  => el.style.display = row.classList.contains('fb-open') ? ''     : 'none');
+        });
+      });
     }
 
     /* ── Render ────────────────────────────────────── */
@@ -222,8 +337,11 @@
     }
 
     async function refresh() {
-      try { showDashboard(await fetchData()); }
-      catch { alert('Failed to refresh. You may need to sign in again.'); }
+      try {
+        showDashboard(await fetchData());
+        allFeedback = [];
+        if ($('tab-feedback').classList.contains('active')) loadFeedback();
+      } catch { alert('Failed to refresh. You may need to sign in again.'); }
     }
 
     function signOut() {

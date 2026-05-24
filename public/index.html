@@ -149,6 +149,50 @@
 
 
   <!-- =============================================================
+       FEEDBACK MODAL
+  ============================================================== -->
+  <div id="feedback-modal" class="modal-overlay hidden" aria-modal="true" role="dialog" aria-label="Share feedback">
+    <div class="modal-card feedback-modal-card">
+      <button class="modal-close" onclick="closeFeedbackModal()" aria-label="Close">✕</button>
+      <h2>Share Your Feedback</h2>
+      <p class="modal-subtitle">Help make ReflectAI better — takes 2 minutes.</p>
+
+      <form id="feedback-form" onsubmit="submitFeedback(event)" novalidate>
+
+        <div class="feedback-q">
+          <label for="fb-likes">1. What do you like most about ReflectAI?</label>
+          <textarea id="fb-likes" class="feedback-ta"
+            placeholder="The AI prompts, the design, how it makes me reflect…"
+            maxlength="2000" rows="3"></textarea>
+        </div>
+
+        <div class="feedback-q">
+          <label for="fb-improve">2. What would you improve?</label>
+          <textarea id="fb-improve" class="feedback-ta"
+            placeholder="Something you wish it did, or did differently…"
+            maxlength="2000" rows="3"></textarea>
+        </div>
+
+        <div class="feedback-q">
+          <label>3. Would you pay ₦3,000/month for this?</label>
+          <div class="feedback-pay-row">
+            <button type="button" class="feedback-pay-btn" data-val="yes"   onclick="selectPayOpt('yes')">👍 Yes</button>
+            <button type="button" class="feedback-pay-btn" data-val="maybe" onclick="selectPayOpt('maybe')">🤔 Maybe</button>
+            <button type="button" class="feedback-pay-btn" data-val="no"    onclick="selectPayOpt('no')">👎 No</button>
+          </div>
+        </div>
+
+        <div id="feedback-error" class="error-msg hidden" role="alert"></div>
+
+        <button type="submit" class="btn btn-primary feedback-submit-btn" id="feedback-submit-btn">
+          Send Feedback →
+        </button>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- =============================================================
        NAVIGATION
   ============================================================== -->
   <nav>
@@ -478,6 +522,7 @@
         </div>
         <div class="account-actions">
           <button class="btn btn-secondary" id="account-upgrade-btn" onclick="showUpgradeModal()">Upgrade to Pro</button>
+          <button class="btn btn-secondary" onclick="showFeedbackModal()">Share Feedback</button>
           <button class="btn btn-ghost" onclick="handleLogout()">Log out</button>
         </div>
       </div>

@@ -1212,7 +1212,52 @@ function escapeHTML(str) {
 
 
 /* ================================================================
-   23. PWA — service worker + install prompt
+   23. FEEDBACK
+================================================================ */
+let _selectedPayOpt = null;
+
+function showFeedbackModal() { document.getElementById('feedback-modal')?.classList.remove('hidden'); }
+function closeFeedbackModal() { document.getElementById('feedback-modal')?.classList.add('hidden'); }
+
+function selectPayOpt(val) {
+  _selectedPayOpt = val;
+  document.querySelectorAll('.feedback-pay-btn').forEach(b => b.classList.toggle('selected', b.dataset.val === val));
+}
+
+async function submitFeedback(event) {
+  event.preventDefault();
+  const likes   = document.getElementById('fb-likes').value.trim();
+  const improve = document.getElementById('fb-improve').value.trim();
+  const errEl   = document.getElementById('feedback-error');
+  const btn     = document.getElementById('feedback-submit-btn');
+
+  errEl.classList.add('hidden');
+  if (!likes && !improve && !_selectedPayOpt) {
+    errEl.textContent = 'Please answer at least one question before submitting.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    await api('POST', '/api/feedback', { likes, improve, wouldPay: _selectedPayOpt });
+    closeFeedbackModal();
+    showToast('Thanks for your feedback! 🙏');
+    document.getElementById('fb-likes').value = '';
+    document.getElementById('fb-improve').value = '';
+    _selectedPayOpt = null;
+    document.querySelectorAll('.feedback-pay-btn').forEach(b => b.classList.remove('selected'));
+  } catch (err) {
+    errEl.textContent = 'Could not send feedback: ' + err.message;
+    errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Send Feedback →';
+  }
+}
+
+
+/* ================================================================
+   24. PWA — service worker + install prompt
 ================================================================ */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

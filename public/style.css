@@ -1464,6 +1464,69 @@ footer {
   margin-bottom: 1.75rem;
 }
 
+/* ── Feedback modal ──────────────────────────────────────────── */
+.feedback-modal-card {
+  max-width: 500px;
+  text-align: left;
+}
+
+.feedback-q {
+  margin-bottom: 1.2rem;
+}
+
+.feedback-q label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.45rem;
+}
+
+.feedback-ta {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.875rem;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 76px;
+  outline: none;
+  transition: border-color var(--ease);
+}
+.feedback-ta:focus { border-color: var(--primary); }
+
+.feedback-pay-row {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.feedback-pay-btn {
+  flex: 1;
+  padding: 0.6rem 0.4rem;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--ease), border-color var(--ease), color var(--ease);
+}
+.feedback-pay-btn:hover  { border-color: var(--primary); color: var(--primary); }
+.feedback-pay-btn.selected {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.feedback-submit-btn {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
 .plan-feature-list {
   list-style: none;
   text-align: left;
