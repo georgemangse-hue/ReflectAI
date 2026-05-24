@@ -875,7 +875,84 @@ footer {
 
 
 /* ================================================================
-   18. ANIMATIONS
+   18. PWA INSTALL BANNER
+================================================================ */
+.pwa-banner {
+  position: fixed;
+  bottom: 5rem; /* clears the mobile nav bar */
+  left: 1rem;
+  right: 1rem;
+  max-width: 520px;
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  box-shadow: var(--shadow-lg);
+  z-index: 300;
+  animation: pwaSlideUp 0.35s var(--ease-spring);
+}
+
+@keyframes pwaSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.pwa-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.pwa-banner-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+
+.pwa-banner-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pwa-banner-text strong {
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.pwa-banner-text span {
+  font-size: 0.77rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pwa-banner-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+@media (max-width: 400px) {
+  .pwa-banner { flex-direction: column; align-items: flex-start; }
+  .pwa-banner-actions { width: 100%; }
+  .pwa-banner-actions .btn { flex: 1; }
+}
+
+/* On desktop the mobile nav is hidden, so less bottom offset needed */
+@media (min-width: 601px) {
+  .pwa-banner { bottom: 1.5rem; }
+}
+
+
+/* ================================================================
+   19. ANIMATIONS
 ================================================================ */
 @keyframes spin {
   to { transform: rotate(360deg); }

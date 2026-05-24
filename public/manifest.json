@@ -1,0 +1,24 @@
+{
+  "name": "ReflectAI",
+  "short_name": "ReflectAI",
+  "description": "Your private AI journaling companion",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#3a8f65",
+  "background_color": "#0d1a11",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Full-bleed background (no rounded corners — OS applies the mask) -->
+  <rect width="512" height="512" fill="#132019"/>
+
+  <!-- Leaf scaled into the 80% maskable safe zone (approx 204–308 x, 168–344 y) -->
+  <!-- Left half -->
+  <path d="M256 136 C232 158 192 208 192 288 C192 336 220 364 256 372 C256 372 256 268 256 136 Z"
+        fill="#2a6b4a"/>
+
+  <!-- Right half -->
+  <path d="M256 136 C280 158 320 208 320 288 C320 336 292 364 256 372 C256 372 256 268 256 136 Z"
+        fill="#5bbf90"/>
+
+  <!-- Highlight -->
+  <path d="M274 160 C302 192 316 234 316 280"
+        fill="none" stroke="white" stroke-width="8"
+        stroke-linecap="round" opacity="0.18"/>
+
+  <!-- Centre vein -->
+  <line x1="256" y1="148" x2="256" y2="366"
+        stroke="#0d1a11" stroke-width="7"
+        stroke-linecap="round" opacity="0.45"/>
+
+  <!-- Side veins right -->
+  <line x1="256" y1="210" x2="296" y2="228" stroke="#0d1a11" stroke-width="4" stroke-linecap="round" opacity="0.3"/>
+  <line x1="256" y1="252" x2="308" y2="266" stroke="#0d1a11" stroke-width="4" stroke-linecap="round" opacity="0.3"/>
+  <line x1="256" y1="294" x2="304" y2="306" stroke="#0d1a11" stroke-width="4" stroke-linecap="round" opacity="0.3"/>
+
+  <!-- Side veins left -->
+  <line x1="256" y1="210" x2="216" y2="228" stroke="#0d1a11" stroke-width="4" stroke-linecap="round" opacity="0.3"/>
+  <line x1="256" y1="252" x2="204" y2="266" stroke="#0d1a11" stroke-width="4" stroke-linecap="round" opacity="0.3"/>
+  <line x1="256" y1="294" x2="208" y2="306" stroke="#0d1a11" stroke-width="4" stroke-linecap="round" opacity="0.3"/>
+</svg>

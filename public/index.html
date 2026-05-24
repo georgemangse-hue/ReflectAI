@@ -6,6 +6,13 @@
   <title>ReflectAI – Your Daily Journal</title>
   <meta name="description" content="A private AI journaling app for students and young professionals." />
   <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#3a8f65" />
+  <!-- iOS / Safari PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="ReflectAI" />
+  <link rel="apple-touch-icon" href="/icons/icon.svg" />
   <!-- Apply saved theme before first paint to prevent flash -->
   <script>
     (function () {
@@ -509,6 +516,21 @@
     </div>
   </nav>
 
+
+  <!-- PWA install banner — shown after engagement when browser supports it -->
+  <div id="pwa-banner" class="pwa-banner hidden" role="complementary" aria-label="Install app">
+    <div class="pwa-banner-left">
+      <span class="pwa-banner-icon" aria-hidden="true">🌿</span>
+      <div class="pwa-banner-text">
+        <strong>Add to Home Screen</strong>
+        <span>Open ReflectAI like an app — no browser bar</span>
+      </div>
+    </div>
+    <div class="pwa-banner-actions">
+      <button class="btn btn-primary btn-sm" onclick="triggerPwaInstall()">Install</button>
+      <button class="btn btn-ghost btn-sm" onclick="dismissPwaBanner()">Not now</button>
+    </div>
+  </div>
 
   <!-- Paystack inline JS — loads payment popup. Safe to fail silently (handled in app.js) -->
   <script src="https://js.paystack.co/v1/inline.js"></script>

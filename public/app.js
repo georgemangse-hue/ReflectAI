@@ -1212,7 +1212,53 @@ function escapeHTML(str) {
 
 
 /* ================================================================
-   23. BOOT
+   23. PWA — service worker + install prompt
+================================================================ */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
+let _pwaPrompt = null;
+const PWA_DISMISSED_KEY = 'reflectai_pwa_dismissed';
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _pwaPrompt = e;
+});
+
+window.addEventListener('appinstalled', () => {
+  _pwaPrompt = null;
+  document.getElementById('pwa-banner')?.classList.add('hidden');
+  showToast('ReflectAI added to your home screen!');
+});
+
+function maybeShowPwaBanner() {
+  if (!_pwaPrompt) return;
+  if (localStorage.getItem(PWA_DISMISSED_KEY)) return;
+  setTimeout(() => {
+    if (_pwaPrompt) document.getElementById('pwa-banner')?.classList.remove('hidden');
+  }, 45000);
+}
+
+function dismissPwaBanner() {
+  document.getElementById('pwa-banner')?.classList.add('hidden');
+  localStorage.setItem(PWA_DISMISSED_KEY, '1');
+}
+
+async function triggerPwaInstall() {
+  if (!_pwaPrompt) return;
+  _pwaPrompt.prompt();
+  const { outcome } = await _pwaPrompt.userChoice;
+  _pwaPrompt = null;
+  document.getElementById('pwa-banner')?.classList.add('hidden');
+  if (outcome === 'accepted') showToast('ReflectAI added to your home screen!');
+}
+
+
+/* ================================================================
+   24. BOOT
 ================================================================ */
 document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
@@ -1222,6 +1268,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadConfig();
   await initAuth();
   handleStripeReturn();
+  maybeShowPwaBanner();
 });
 
 window.addEventListener('resize', () => {

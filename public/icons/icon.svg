@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background rounded square -->
+  <rect width="512" height="512" rx="112" fill="#132019"/>
+
+  <!-- Leaf left half (darker) -->
+  <path d="M256 88 C218 122 136 188 136 304 C136 384 192 436 256 444 C256 444 256 296 256 88 Z"
+        fill="#2a6b4a"/>
+
+  <!-- Leaf right half (lighter) -->
+  <path d="M256 88 C294 122 376 188 376 304 C376 384 320 436 256 444 C256 444 256 296 256 88 Z"
+        fill="#5bbf90"/>
+
+  <!-- Highlight sheen on right -->
+  <path d="M294 130 C336 174 368 232 370 296"
+        fill="none" stroke="white" stroke-width="10"
+        stroke-linecap="round" opacity="0.18"/>
+
+  <!-- Centre vein -->
+  <line x1="256" y1="104" x2="256" y2="436"
+        stroke="#0d1a11" stroke-width="9"
+        stroke-linecap="round" opacity="0.45"/>
+
+  <!-- Side veins right -->
+  <line x1="256" y1="196" x2="324" y2="228" stroke="#0d1a11" stroke-width="5" stroke-linecap="round" opacity="0.3"/>
+  <line x1="256" y1="258" x2="344" y2="282" stroke="#0d1a11" stroke-width="5" stroke-linecap="round" opacity="0.3"/>
+  <line x1="256" y1="318" x2="338" y2="338" stroke="#0d1a11" stroke-width="5" stroke-linecap="round" opacity="0.3"/>
+
+  <!-- Side veins left -->
+  <line x1="256" y1="196" x2="188" y2="228" stroke="#0d1a11" stroke-width="5" stroke-linecap="round" opacity="0.3"/>
+  <line x1="256" y1="258" x2="168" y2="282" stroke="#0d1a11" stroke-width="5" stroke-linecap="round" opacity="0.3"/>
+  <line x1="256" y1="318" x2="174" y2="338" stroke="#0d1a11" stroke-width="5" stroke-linecap="round" opacity="0.3"/>
+</svg>
