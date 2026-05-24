@@ -1,0 +1,17 @@
+{
+  "name": "reflectai",
+  "version": "1.0.0",
+  "description": "AI-powered private journaling app",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "playwright": "^1.60.0"
+  }
+}
+

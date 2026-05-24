@@ -1,0 +1,2295 @@
+/* ================================================================
+   ReflectAI – style.css  (v2 – Calm Green redesign)
+
+   Structure
+   ---------
+    1. Design tokens
+    2. Reset & base
+    3. Typography
+    4. Layout utilities
+    5. Scroll-reveal
+    6. Navigation (desktop)
+    7. Mobile bottom nav
+    8. Hero section
+    9. Buttons
+   10. Section scaffolding
+   11. Journal form
+   12. Reflection prompts
+   13. Loader / spinner
+   14. Weekly insight
+   15. Entry history
+   16. Footer
+   17. Toast notification
+   18. Animations
+   19. Responsive (tablet + mobile)
+================================================================ */
+
+
+/* ================================================================
+   1. DESIGN TOKENS
+================================================================ */
+:root {
+  /* Colour system — soft greens & clean whites */
+  --bg:            #f4fbf7;
+  --surface:       #ffffff;
+  --surface-2:     #f0f9f4;
+  --primary:       #3a8f65;
+  --primary-dark:  #2a6b4a;
+  --primary-light: #e8f5ef;
+  --accent:        #8dc4a8;
+  --text:          #1b3028;
+  --text-muted:    #587568;
+  --border:        #cde5d8;
+  --border-light:  #e2f0e8;
+  --error-bg:      #fff5f5;
+  --error-text:    #dc2626;
+  --error-border:  #fecaca;
+
+  /* Green-tinted shadows */
+  --shadow-sm: 0 1px 3px rgba(30, 90, 60, 0.06), 0 1px 2px rgba(30, 90, 60, 0.04);
+  --shadow:    0 4px 18px rgba(30, 90, 60, 0.09), 0 2px 6px rgba(30, 90, 60, 0.05);
+  --shadow-lg: 0 12px 36px rgba(30, 90, 60, 0.14), 0 4px 12px rgba(30, 90, 60, 0.07);
+
+  /* Shape */
+  --radius:      16px;
+  --radius-sm:   10px;
+  --radius-pill: 100px;
+
+  /* Motion */
+  --ease:        0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out:    0.35s cubic-bezier(0, 0, 0.2, 1);
+
+  /* Layout */
+  --max-width:     840px;
+  --nav-h:         62px;
+  --bottom-nav-h:  64px;
+}
+
+
+/* ================================================================
+   2. RESET & BASE
+================================================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--nav-h) + 12px);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
+/* ================================================================
+   3. TYPOGRAPHY
+================================================================ */
+h1 {
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+h3 { font-size: 1.05rem; font-weight: 600; }
+
+p { margin-top: 0.5rem; }
+
+em {
+  font-style: italic;
+  color: var(--primary);
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+a:hover { text-decoration: underline; }
+
+
+/* ================================================================
+   4. LAYOUT UTILITIES
+================================================================ */
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.hidden { display: none !important; }
+
+.text-muted {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: 0.4rem;
+}
+
+
+/* ================================================================
+   5. SCROLL-REVEAL
+   JS adds .visible when an element scrolls into view.
+================================================================ */
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out);
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal-delay-1 { transition-delay: 0.08s; }
+.reveal-delay-2 { transition-delay: 0.16s; }
+.reveal-delay-3 { transition-delay: 0.24s; }
+
+
+/* ================================================================
+   6. NAVIGATION — desktop sticky top bar
+================================================================ */
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: var(--nav-h);
+  background: rgba(244, 251, 247, 0.92);
+  -webkit-backdrop-filter: blur(14px) saturate(1.5);
+  backdrop-filter: blur(14px) saturate(1.5);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.nav-inner {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+  transition: opacity var(--ease);
+}
+.logo:hover { text-decoration: none; opacity: 0.8; }
+.logo .logo-word { color: var(--text); }
+
+.nav-links {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.nav-links a {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius-pill);
+  transition: color var(--ease), background var(--ease);
+  text-decoration: none;
+}
+.nav-links a:hover {
+  color: var(--primary);
+  background: var(--primary-light);
+  text-decoration: none;
+}
+
+
+/* ================================================================
+   7. MOBILE BOTTOM NAV
+   Hidden on desktop; shown at ≤ 600 px.
+================================================================ */
+.mobile-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  height: var(--bottom-nav-h);
+  background: rgba(255, 255, 255, 0.97);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-top: 1px solid var(--border-light);
+  box-shadow: 0 -4px 20px rgba(30, 90, 60, 0.07);
+}
+
+.mobile-nav-inner {
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.mobile-nav-link {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 0.5rem 0;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  transition: color var(--ease);
+}
+.mobile-nav-link .nav-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: transform var(--ease-spring);
+}
+.mobile-nav-link:hover,
+.mobile-nav-link:active {
+  color: var(--primary);
+  text-decoration: none;
+}
+.mobile-nav-link:hover .nav-icon {
+  transform: translateY(-2px);
+}
+
+
+/* ================================================================
+   8. HERO SECTION
+================================================================ */
+#hero {
+  padding: 5.5rem 0 4.5rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 55% at 18% 75%, rgba(56, 143, 101, 0.11) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 82% 15%, rgba(141, 196, 168, 0.13) 0%, transparent 55%),
+    radial-gradient(ellipse 80% 60% at 50% 115%, rgba(56, 143, 101, 0.07) 0%, transparent 50%),
+    var(--bg);
+}
+
+/* Decorative soft blobs */
+#hero::before,
+#hero::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  user-select: none;
+}
+#hero::before {
+  width: 360px;
+  height: 360px;
+  background: radial-gradient(circle, rgba(56, 143, 101, 0.09) 0%, transparent 70%);
+  top: -100px;
+  right: -100px;
+  animation: floatA 9s ease-in-out infinite;
+}
+#hero::after {
+  width: 260px;
+  height: 260px;
+  background: radial-gradient(circle, rgba(141, 196, 168, 0.11) 0%, transparent 70%);
+  bottom: -70px;
+  left: -50px;
+  animation: floatB 11s ease-in-out infinite;
+}
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.32rem 0.95rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  margin-bottom: 1.5rem;
+}
+
+#hero h1 {
+  margin-bottom: 1.25rem;
+  position: relative;
+}
+
+/* Gradient text for the italic emphasis */
+#hero h1 em {
+  color: transparent;
+  background: linear-gradient(135deg, var(--primary) 10%, #5dbf8a 90%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-style: italic;
+}
+
+.hero-tagline {
+  font-size: clamp(0.95rem, 2vw, 1.1rem);
+  color: var(--text-muted);
+  max-width: 480px;
+  margin: 0 auto 2.5rem;
+  line-height: 1.75;
+}
+
+.hero-features {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 2.75rem;
+}
+
+.badge {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 0.4rem 1rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--ease), transform var(--ease);
+}
+.badge:hover {
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+
+
+/* ================================================================
+   9. BUTTONS
+================================================================ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.82rem 2rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition:
+    background var(--ease),
+    transform var(--ease-spring),
+    box-shadow var(--ease),
+    color var(--ease),
+    border-color var(--ease);
+  text-decoration: none;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(56, 143, 101, 0.30);
+}
+.btn-primary:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(56, 143, 101, 0.38);
+  text-decoration: none;
+  color: #fff;
+}
+.btn-primary:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 10px rgba(56, 143, 101, 0.25);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--primary);
+  border-color: var(--border);
+}
+.btn-secondary:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+
+/* ================================================================
+   10. SECTION SCAFFOLDING
+================================================================ */
+.main-section {
+  padding: 5rem 0;
+  border-top: 1px solid var(--border-light);
+}
+
+.section-label {
+  display: inline-block;
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.22rem 0.65rem;
+  border-radius: 4px;
+  margin-bottom: 0.55rem;
+}
+
+.section-header {
+  margin-bottom: 2.25rem;
+}
+.section-header h2 {
+  margin-top: 0.3rem;
+}
+
+
+/* ================================================================
+   11. JOURNAL FORM
+================================================================ */
+#today-date {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+#today-date::before {
+  content: '🌿';
+}
+
+.journal-textarea {
+  width: 100%;
+  min-height: 300px;
+  padding: 1.3rem 1.5rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-family: inherit;
+  line-height: 1.8;
+  color: var(--text);
+  background: var(--surface);
+  resize: none;
+  outline: none;
+  overflow: hidden;
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+.journal-textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(56, 143, 101, 0.13);
+}
+.journal-textarea::placeholder {
+  color: #a0bfac;
+}
+
+.form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.form-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.draft-indicator {
+  font-size: 0.76rem;
+  color: var(--primary);
+  font-style: italic;
+}
+
+.btn-save-draft {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 500;
+  padding: 0.25rem 0.7rem;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+  transition: color var(--ease), border-color var(--ease), background var(--ease);
+}
+.btn-save-draft:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+#char-count {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+#char-count.warn {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+
+/* ================================================================
+   12. REFLECTION PROMPTS
+================================================================ */
+#prompts-section {
+  margin-top: 2.5rem;
+  padding-top: 2.25rem;
+  border-top: 2px dashed var(--border);
+}
+
+.prompts-heading {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 1.1rem;
+}
+
+.prompts-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.prompt-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius-sm);
+  padding: 1.2rem 1.4rem;
+  box-shadow: var(--shadow-sm);
+  animation: fadeSlideUp 0.45s var(--ease-out) both;
+  transition: box-shadow var(--ease), transform var(--ease);
+}
+.prompt-card:hover {
+  box-shadow: var(--shadow);
+  transform: translateX(4px);
+}
+.prompt-card:nth-child(2) { animation-delay: 0.09s; }
+.prompt-card:nth-child(3) { animation-delay: 0.18s; }
+
+.prompt-category {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+}
+
+.prompt-text {
+  font-size: 0.975rem;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+
+/* ================================================================
+   13. LOADER / SPINNER
+================================================================ */
+.loader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  padding: 1.5rem 0;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: spin 0.7s linear infinite;
+}
+
+.error-msg {
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  border-radius: var(--radius-sm);
+  padding: 0.9rem 1.1rem;
+  color: var(--error-text);
+  font-size: 0.875rem;
+  margin-top: 1rem;
+}
+
+
+/* ================================================================
+   14. WEEKLY INSIGHT
+================================================================ */
+#weekly-section {
+  background:
+    radial-gradient(ellipse at 92% 92%, rgba(141, 196, 168, 0.11) 0%, transparent 55%),
+    radial-gradient(ellipse at 6% 6%, rgba(56, 143, 101, 0.07) 0%, transparent 55%),
+    var(--bg);
+}
+
+.insight-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 2.25rem;
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+}
+
+.insight-card::before {
+  content: '\201C';
+  position: absolute;
+  top: -1.2rem;
+  left: 1.25rem;
+  font-size: 9rem;
+  color: var(--primary-light);
+  font-family: Georgia, 'Times New Roman', serif;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
+#insight-text {
+  position: relative;
+  padding-top: 0.75rem;
+  font-size: 0.975rem;
+  line-height: 1.85;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+#insight-text.placeholder-text {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.insight-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-light);
+}
+
+.insight-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+
+/* ================================================================
+   15. ENTRY HISTORY
+================================================================ */
+.history-controls {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.history-empty {
+  text-align: center;
+  padding: 4rem 1rem;
+  color: var(--text-muted);
+}
+.history-empty-icon {
+  font-size: 2.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.history-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  transition: box-shadow var(--ease), border-color var(--ease);
+}
+.history-item:hover {
+  box-shadow: var(--shadow);
+  border-color: var(--accent);
+}
+
+.history-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  user-select: none;
+  gap: 1rem;
+}
+
+.history-item-meta { flex: 1; min-width: 0; }
+
+.history-date {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.history-preview {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 0.15rem;
+}
+
+.history-chevron {
+  font-size: 0.6rem;
+  color: var(--accent);
+  transition: transform var(--ease);
+  flex-shrink: 0;
+}
+.history-item.open .history-chevron {
+  transform: rotate(180deg);
+}
+
+.history-body {
+  display: none;
+  padding: 1.1rem 1.25rem 1.3rem;
+  border-top: 1px solid var(--border-light);
+  font-size: 0.92rem;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  color: var(--text);
+  background: var(--surface-2);
+}
+.history-item.open .history-body {
+  display: block;
+  animation: fadeSlideUp 0.22s var(--ease-out);
+}
+
+
+/* ================================================================
+   16. THEME TOGGLE BUTTON
+================================================================ */
+.theme-toggle {
+  background: var(--primary-light);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  flex-shrink: 0;
+  transition:
+    background var(--ease),
+    border-color var(--ease),
+    transform var(--ease-spring);
+}
+.theme-toggle:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  transform: scale(1.12) rotate(18deg);
+}
+.theme-toggle:active {
+  transform: scale(0.95);
+}
+
+/* Smooth icon swap */
+.theme-icon {
+  display: block;
+  transition: transform 0.3s var(--ease-spring), opacity 0.2s var(--ease);
+}
+.theme-toggle:hover .theme-icon {
+  transform: rotate(-18deg); /* counter-rotate so icon stays upright */
+}
+
+
+/* ================================================================
+   17. FOOTER
+================================================================ */
+footer {
+  padding: 2.75rem 0;
+  text-align: center;
+  border-top: 1px solid var(--border-light);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.8;
+}
+
+
+/* ================================================================
+   17. TOAST NOTIFICATION
+================================================================ */
+.toast {
+  position: fixed;
+  bottom: 1.75rem;
+  right: 1.75rem;
+  z-index: 9999;
+  background: var(--text);
+  color: #fff;
+  padding: 0.8rem 1.4rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  box-shadow: var(--shadow-lg);
+  animation: toastIn 0.38s var(--ease-spring);
+  max-width: 320px;
+  border-left: 3px solid var(--primary);
+}
+
+
+/* ================================================================
+   18. ANIMATIONS
+================================================================ */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(1rem); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes floatA {
+  0%, 100% { transform: translate(0, 0)        scale(1);    }
+  33%       { transform: translate(-18px, 22px) scale(1.05); }
+  66%       { transform: translate(12px, -14px) scale(0.97); }
+}
+
+@keyframes floatB {
+  0%, 100% { transform: translate(0, 0)        scale(1);    }
+  40%       { transform: translate(22px, -26px) scale(1.06); }
+  70%       { transform: translate(-12px, 14px) scale(0.95); }
+}
+
+
+/* ================================================================
+   19. RESPONSIVE
+================================================================ */
+
+/* Tablet */
+@media (max-width: 768px) {
+  .main-section { padding: 3.75rem 0; }
+  #hero { padding: 4rem 0 3.25rem; }
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  /* Hide desktop nav links; bottom nav takes over */
+  .nav-links { display: none; }
+
+  /* Show the mobile bottom tab bar */
+  .mobile-nav { display: block; }
+
+  /* Reserve space for the tab bar */
+  body { padding-bottom: var(--bottom-nav-h); }
+
+  #hero { padding: 3rem 0 2.75rem; }
+  .main-section { padding: 3rem 0; }
+
+  /* Stack the CTA full-width */
+  #hero .btn {
+    display: flex;
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+
+  /* Stack form footer vertically */
+  .form-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .form-footer .btn { justify-content: center; }
+
+  /* Stack insight footer vertically */
+  .insight-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .insight-footer .btn {
+    justify-content: center;
+  }
+
+  /* Toast sits above the bottom nav */
+  .toast {
+    left: 1rem;
+    right: 1rem;
+    bottom: calc(var(--bottom-nav-h) + 0.75rem);
+    max-width: none;
+  }
+
+  /* Insight card smaller padding on mobile */
+  .insight-card { padding: 1.5rem 1.25rem; }
+}
+
+
+/* ================================================================
+   21. DARK MODE
+   Applied when <html data-theme="dark">.
+   Overrides design tokens first; explicit rule overrides follow for
+   anything that uses hard-coded colour values instead of variables.
+================================================================ */
+[data-theme="dark"] {
+  --bg:            #0d1a11;
+  --surface:       #132019;
+  --surface-2:     #192820;
+  --primary:       #4dba7e;
+  --primary-dark:  #3da06a;
+  --primary-light: #193326;
+  --accent:        #5fa87e;
+  --text:          #dff0e7;
+  --text-muted:    #7aaa8e;
+  --border:        #2a4038;
+  --border-light:  #1e3028;
+  --error-bg:      #2c1515;
+  --error-text:    #f87171;
+  --error-border:  #7f1d1d;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow:    0 4px 18px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 36px rgba(0, 0, 0, 0.65);
+}
+
+/* Nav & mobile nav backgrounds use hard-coded rgba — override them */
+[data-theme="dark"] nav {
+  background: rgba(13, 26, 17, 0.92);
+}
+[data-theme="dark"] .mobile-nav {
+  background: rgba(19, 32, 25, 0.97);
+}
+
+/* Hero gradient blobs */
+[data-theme="dark"] #hero {
+  background:
+    radial-gradient(ellipse 70% 55% at 18% 75%, rgba(77, 186, 126, 0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 82% 15%, rgba(95, 168, 126, 0.08) 0%, transparent 55%),
+    radial-gradient(ellipse 80% 60% at 50% 115%, rgba(77, 186, 126, 0.04) 0%, transparent 50%),
+    var(--bg);
+}
+[data-theme="dark"] #hero::before {
+  background: radial-gradient(circle, rgba(77, 186, 126, 0.07) 0%, transparent 70%);
+}
+[data-theme="dark"] #hero::after {
+  background: radial-gradient(circle, rgba(95, 168, 126, 0.07) 0%, transparent 70%);
+}
+
+/* Weekly section background */
+[data-theme="dark"] #weekly-section {
+  background:
+    radial-gradient(ellipse at 92% 92%, rgba(95, 168, 126, 0.07) 0%, transparent 55%),
+    radial-gradient(ellipse at 6%  6%,  rgba(77, 186, 126, 0.05) 0%, transparent 55%),
+    var(--bg);
+}
+
+/* Toast: var(--text) is light in dark mode, so give it a fixed dark surface */
+[data-theme="dark"] .toast {
+  background: #1e3228;
+  color: var(--text);
+}
+
+
+/* ================================================================
+   22. AUTH OVERLAY
+================================================================ */
+.auth-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background:
+    radial-gradient(ellipse 70% 60% at 20% 80%, rgba(56, 143, 101, 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 15%, rgba(141, 196, 168, 0.14) 0%, transparent 55%),
+    var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.auth-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2.5rem 2rem;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: var(--shadow-lg);
+  animation: fadeSlideUp 0.4s var(--ease-out);
+}
+
+.auth-logo {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--primary);
+  margin-bottom: 0.3rem;
+  letter-spacing: -0.02em;
+}
+
+.auth-tagline {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  margin-bottom: 1.75rem;
+}
+
+.auth-tabs {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 3px;
+  margin-bottom: 1.5rem;
+  background: var(--surface-2);
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 0.5rem;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--ease), color var(--ease);
+}
+.auth-tab.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.auth-form { display: flex; flex-direction: column; gap: 1rem; }
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.form-group label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+.form-group input {
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.975rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+.form-group input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(56, 143, 101, 0.12);
+}
+
+.auth-submit {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.auth-privacy {
+  text-align: center;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin-top: 1.25rem;
+}
+
+
+/* ================================================================
+   23. PLAN BADGES
+================================================================ */
+.plan-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.55rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  background: var(--primary-light);
+  color: var(--primary);
+  border: 1px solid var(--border);
+}
+.plan-badge.pro {
+  background: linear-gradient(135deg, #2a6b4a, #3a8f65);
+  color: #fff;
+  border-color: transparent;
+}
+
+.pro-badge-large {
+  display: inline-flex;
+  padding: 0.3rem 0.8rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  background: linear-gradient(135deg, #2a6b4a, #3a8f65);
+  color: #fff;
+  margin-bottom: 1rem;
+}
+
+
+/* ================================================================
+   24. NAV UPDATES (user area + ghost button)
+================================================================ */
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.nav-email {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm);
+  transition: color var(--ease), background var(--ease);
+}
+.btn-ghost:hover {
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+.nav-logout { padding: 0.35rem 0.7rem; }
+
+
+/* ================================================================
+   25. STREAK WIDGET
+================================================================ */
+.journal-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.streak-widget {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.25rem;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--ease), border-color var(--ease), transform var(--ease);
+  flex-shrink: 0;
+}
+.streak-widget.streak-active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(56, 143, 101, 0.12), var(--shadow-sm);
+}
+.streak-widget:hover { box-shadow: var(--shadow); }
+
+.streak-flame {
+  font-size: 1.6rem;
+  line-height: 1;
+  filter: grayscale(0.4);
+  transition: filter var(--ease), transform var(--ease-spring);
+}
+.streak-widget.streak-active .streak-flame {
+  filter: none;
+  animation: flamePulse 2s ease-in-out infinite;
+}
+
+.streak-count-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+
+.streak-number {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.streak-unit {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.streak-message {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
+@keyframes flamePulse {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50%       { transform: scale(1.12) rotate(-4deg); }
+}
+
+
+/* ================================================================
+   26. PRO LOCK OVERLAY
+================================================================ */
+.pro-lock {
+  background: var(--surface);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 3rem 2rem;
+  text-align: center;
+}
+
+.pro-lock-inner {
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.pro-lock-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+.pro-lock h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.pro-lock p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+  line-height: 1.65;
+}
+
+
+/* ================================================================
+   27. UPGRADE MODAL
+================================================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s var(--ease-out);
+}
+
+.modal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2.5rem 2rem;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: var(--shadow-lg);
+  position: relative;
+  animation: fadeSlideUp 0.35s var(--ease-out);
+  text-align: center;
+}
+
+.modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  transition: background var(--ease), color var(--ease);
+}
+.modal-close:hover { background: var(--primary-light); color: var(--primary); }
+
+.modal-card h2 { margin-bottom: 0.4rem; }
+
+.modal-subtitle {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 1.75rem;
+}
+
+.plan-feature-list {
+  list-style: none;
+  text-align: left;
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.plan-feature-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.feat-check {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.upgrade-cta { width: 100%; font-size: 1rem; padding: 0.9rem 2rem; }
+
+.upgrade-demo-note {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.85rem;
+  font-style: italic;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+
+/* ================================================================
+   28. GOALS SECTION
+================================================================ */
+.goal-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.4rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.goal-form-row {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.goal-input {
+  flex: 1;
+  min-width: 160px;
+  padding: 0.72rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+.goal-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(56, 143, 101, 0.12);
+}
+
+.goal-date-input { flex: 0 0 auto; min-width: 140px; }
+
+.goal-desc-input {
+  width: 100%;
+  padding: 0.72rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+  resize: vertical;
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+.goal-desc-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(56, 143, 101, 0.12);
+}
+
+/* Goal cards */
+.goals-list { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.goals-empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.goal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1.1rem 1.25rem;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--ease), border-color var(--ease);
+  animation: fadeSlideUp 0.3s var(--ease-out);
+}
+.goal-card:hover { box-shadow: var(--shadow); }
+.goal-card.goal-done { opacity: 0.65; }
+
+.goal-card-header {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.goal-card-info { flex: 1; min-width: 0; }
+
+.goal-title-text {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.2rem;
+}
+.goal-done .goal-title-text { text-decoration: line-through; }
+
+.goal-desc-text {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  line-height: 1.55;
+}
+
+.goal-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.goal-status-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 0.18rem 0.55rem;
+  border-radius: 4px;
+}
+.goal-status-badge.active {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+.goal-status-badge.done {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+.goal-date-text {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.goal-card-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+/* Small button variant */
+.btn-sm {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8rem;
+  border-radius: var(--radius-pill);
+}
+
+.btn-ghost-danger {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.4rem 0.65rem;
+  border-radius: var(--radius-sm);
+  transition: color var(--ease), background var(--ease);
+}
+.btn-ghost-danger:hover { color: var(--error-text); background: var(--error-bg); }
+
+.goal-checkin-result {
+  margin-top: 0.9rem;
+  padding: 0.85rem 1rem;
+  background: var(--primary-light);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--text);
+  animation: fadeSlideUp 0.25s var(--ease-out);
+}
+
+
+/* ================================================================
+   29. ACCOUNT SECTION
+================================================================ */
+.account-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.account-email {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 0.4rem;
+}
+
+.account-plan-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.account-plan-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.account-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+
+/* ================================================================
+   30. MOOD SELECTOR
+================================================================ */
+.mood-selector {
+  margin-bottom: 1.25rem;
+}
+
+.mood-selector-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.6rem;
+}
+
+.mood-options {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.mood-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.55rem 0.75rem;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s, transform 0.15s, box-shadow 0.18s;
+  min-width: 68px;
+  font-family: inherit;
+}
+
+.mood-btn:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.mood-btn.selected {
+  border-color: #22c55e;
+  border-width: 3px;
+  background: #dcfce7;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25), 0 2px 8px rgba(34, 197, 94, 0.18);
+  transform: translateY(-1px);
+}
+
+.mood-btn.selected .mood-name {
+  color: #15803d;
+  font-weight: 700;
+}
+
+[data-theme="dark"] .mood-btn.selected {
+  background: #14532d;
+  border-color: #4ade80;
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.25), 0 2px 8px rgba(74, 222, 128, 0.15);
+}
+
+[data-theme="dark"] .mood-btn.selected .mood-name {
+  color: #86efac;
+}
+
+.mood-emoji {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.mood-name {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mood-btn.selected .mood-name {
+  color: var(--primary-dark);
+}
+
+
+/* ================================================================
+   31. MOOD CHART SECTION
+================================================================ */
+#mood-section {
+  padding: 2rem 0;
+}
+
+.mood-chart-card {
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 1.5rem 1.5rem 1rem;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border-light);
+}
+
+.mood-chart-card h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 1rem;
+}
+
+.mood-chart-canvas {
+  width: 100%;
+  height: 180px;
+  display: block;
+  border-radius: 10px;
+}
+
+.mood-frequency {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.mood-freq-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 20px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-light);
+  font-size: 0.82rem;
+}
+
+.mood-freq-emoji {
+  font-size: 1rem;
+}
+
+.mood-freq-label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mood-freq-count {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+
+/* ================================================================
+   32. HISTORY MOOD BADGE
+================================================================ */
+.history-mood {
+  font-size: 1.1rem;
+  line-height: 1;
+  flex-shrink: 0;
+  title: attr(title);
+}
+
+
+/* ================================================================
+   33. RESPONSIVE ADDITIONS (mobile)
+================================================================ */
+@media (max-width: 768px) {
+  .nav-email   { display: none; }
+  .nav-user    { gap: 0.4rem; }
+}
+
+@media (max-width: 600px) {
+  /* Stack journal-top vertically */
+  .journal-top { flex-direction: column; }
+  .streak-widget { width: 100%; }
+
+  /* Goal form stacks */
+  .goal-form-row { flex-direction: column; }
+  .goal-date-input { min-width: unset; }
+
+  /* Account card stacks */
+  .account-card { flex-direction: column; align-items: flex-start; }
+  .account-actions { width: 100%; }
+  .account-actions .btn { flex: 1; justify-content: center; }
+
+  /* Nav user: only show plan badge + logout on mobile */
+  .nav-email { display: none; }
+
+  /* Goals card actions wrap better on small screens */
+  .goal-card-actions { width: 100%; justify-content: flex-start; }
+
+  /* Mood options wrap nicely */
+  .mood-options { gap: 0.4rem; }
+  .mood-btn { min-width: 58px; padding: 0.45rem 0.55rem; }
+  .mood-emoji { font-size: 1.2rem; }
+}
+
+
+/* ================================================================
+   34. PAYMENT WALL
+================================================================ */
+.payment-card {
+  max-width: 460px;
+}
+
+.payment-title {
+  font-size: 1.45rem;
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+  color: var(--text);
+}
+
+.payment-price {
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: var(--primary);
+  margin-bottom: 1.25rem;
+  line-height: 1.2;
+}
+
+.payment-price-note {
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.payment-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5rem;
+  text-align: left;
+}
+
+.payment-features li {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.5rem 0;
+  font-size: 0.9rem;
+  color: var(--text);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.payment-features li:last-child { border-bottom: none; }
+
+.payment-features li > span:first-child {
+  font-size: 1.05rem;
+  width: 1.4rem;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.payment-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 0.7rem;
+}
+
+.payment-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.payment-option-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.payment-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.65rem 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.payment-divider::before,
+.payment-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.btn-paystack,
+.btn-stripe {
+  width: 100%;
+  padding: 0.95rem 1.5rem;
+  font-size: 1rem;
+}
+
+.payment-security {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 0.6rem;
+}
+
+.payment-logout-row {
+  margin-top: 0.2rem;
+}
+
+
+/* ================================================================
+   35. HERO CTA — payment-aware
+================================================================ */
+.hero-cta-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.btn-hero {
+  min-width: 270px;
+  padding: 1rem 2rem;
+  font-size: 1.05rem;
+}
+
+.hero-cta-sub {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.badge-price {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #fff;
+  font-weight: 700;
+}
+
+
+/* ================================================================
+   36. HISTORY — edit button + restructured header
+================================================================ */
+.history-item-header {
+  cursor: default;    /* override any inherited pointer */
+}
+
+.history-item-clickable {
+  flex: 1;
+  cursor: pointer;
+  user-select: none;
+  min-width: 0;
+}
+
+.history-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.history-chevron {
+  cursor: pointer;
+}
+
+.history-edit-btn {
+  font-size: 0.75rem;
+  padding: 0.22rem 0.55rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+.history-item:hover .history-edit-btn,
+.history-item.open  .history-edit-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.history-edited-tag {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  padding: 0 4px;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+
+/* ================================================================
+   37. ENTRY EDIT FORM
+================================================================ */
+.history-edit-form {
+  padding: 1rem 1.25rem 1.25rem;
+  border-top: 1px solid var(--border-light);
+  background: var(--surface-2);
+}
+
+.edit-mood-row {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.edit-mood-row .mood-btn {
+  min-width: 58px;
+  padding: 0.4rem 0.5rem;
+}
+
+.edit-mood-row .mood-emoji { font-size: 1.15rem; }
+
+.edit-textarea {
+  width: 100%;
+  min-height: 110px;
+  margin-bottom: 0.75rem;
+  resize: vertical;
+  font-size: 0.92rem;
+  box-sizing: border-box;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+@media (max-width: 600px) {
+  .history-edit-btn { opacity: 1; pointer-events: auto; }
+  .btn-hero { min-width: unset; width: 100%; }
+  .hero-cta-group { width: 100%; padding: 0 1rem; box-sizing: border-box; }
+}
+
+
+/* ================================================================
+   38. SUBSCRIPTION STATUS (account section)
+================================================================ */
+.subscription-status-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  margin-bottom: 0.75rem;
+  width: 100%;
+}
+
+.subscription-status-text {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  flex: 1;
+  min-width: 0;
+}
+
+/* Active subscription: show a green dot prefix */
+.subscription-status-row:not(.hidden) .subscription-status-text::before {
+  content: '● ';
+  color: var(--primary);
+  font-size: 0.7em;
+}
+
+/* Payment wall — update price note for monthly */
+.payment-price-note {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+
+/* ================================================================
+   39. NAV ACCOUNT LINK
+================================================================ */
+.nav-account-link {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 0.28rem 0.6rem;
+  border-radius: 6px;
+  transition: background 0.12s, color 0.12s;
+}
+.nav-account-link:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+
+/* ================================================================
+   40. HERO SOCIAL PROOF
+================================================================ */
+.hero-social-proof {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  justify-content: center;
+  margin: 0.9rem 0 1.5rem;
+}
+
+.social-avatars {
+  display: flex;
+}
+
+.avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+  border: 2px solid var(--bg);
+  margin-left: -7px;
+}
+.social-avatars .avatar:first-child { margin-left: 0; }
+.av-1 { background: #4dba7e; }
+.av-2 { background: #2d8653; }
+.av-3 { background: #48a876; }
+.av-4 { background: #76b89a; }
+
+.social-proof-text {
+  font-size: 0.87rem;
+  color: var(--text-muted);
+}
+.social-proof-text strong { color: var(--text); }
+
+
+/* ================================================================
+   41. PRICING SECTION
+================================================================ */
+.pricing-section {
+  background: var(--surface-1);
+}
+
+.pricing-card {
+  max-width: 420px;
+  margin: 0 auto;
+  background: var(--bg);
+  border: 2px solid var(--primary);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(45,134,83,0.12);
+}
+
+.pricing-card-header {
+  background: var(--primary);
+  padding: 2rem 2rem 1.5rem;
+  text-align: center;
+  color: #fff;
+}
+
+.pricing-plan-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+  margin-bottom: 0.5rem;
+}
+
+.pricing-amount {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: 0.4rem;
+}
+
+.pricing-currency {
+  font-size: 1.6rem;
+  font-weight: 700;
+  vertical-align: top;
+  line-height: 1.3;
+}
+
+.pricing-period {
+  font-size: 1rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.pricing-tagline {
+  font-size: 0.82rem;
+  opacity: 0.8;
+}
+
+.pricing-features {
+  list-style: none;
+  padding: 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.pricing-features li {
+  font-size: 0.9rem;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.pf-check {
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+.btn-pricing-cta {
+  display: block;
+  width: calc(100% - 4rem);
+  margin: 0 2rem 1rem;
+  font-size: 1rem;
+  padding: 0.85rem;
+}
+
+.pricing-security {
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  padding-bottom: 1.5rem;
+}
+
+
+/* ================================================================
+   42. FREE ENTRY COUNTER + PAYMENT WALL CLOSE
+================================================================ */
+.free-entry-counter {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: right;
+  margin-top: 0.4rem;
+  padding-right: 0.2rem;
+}
+
+.payment-card {
+  position: relative;
+}
+
+.payment-wall-close {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.9rem;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: color 0.12s, background 0.12s;
+}
+.payment-wall-close:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}

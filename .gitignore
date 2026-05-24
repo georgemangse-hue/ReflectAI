@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Environment variables — never commit real keys
+.env
+.env.local
+.env.*.local
+
+# Data files — user entries live here; keep off git
+data/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+*.log

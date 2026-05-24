@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ReflectAI – Your Daily Journal</title>
+  <meta name="description" content="A private AI journaling app for students and young professionals." />
+  <link rel="stylesheet" href="style.css" />
+  <!-- Apply saved theme before first paint to prevent flash -->
+  <script>
+    (function () {
+      var saved = localStorage.getItem('reflectai_theme');
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', saved || (prefersDark ? 'dark' : 'light'));
+    })();
+  </script>
+</head>
+<body>
+
+  <!-- =============================================================
+       AUTH OVERLAY
+       Covers the full page when the user is not logged in.
+  ============================================================== -->
+  <div id="auth-overlay" class="auth-overlay" aria-modal="true" role="dialog" aria-label="Sign in to ReflectAI">
+    <div class="auth-card">
+
+      <div class="auth-logo">🌿 <strong>Reflect</strong>AI</div>
+      <p class="auth-tagline">Your private space to write, reflect, and grow.</p>
+
+      <div class="auth-tabs" role="tablist">
+        <button class="auth-tab active" id="tab-login"  onclick="showAuthTab('login')"  role="tab" aria-selected="true">Log in</button>
+        <button class="auth-tab"        id="tab-signup" onclick="showAuthTab('signup')" role="tab" aria-selected="false">Sign up</button>
+      </div>
+
+      <div id="auth-error" class="error-msg hidden" role="alert"></div>
+
+      <!-- Login -->
+      <form id="login-form" class="auth-form" onsubmit="handleLogin(event)" novalidate>
+        <div class="form-group">
+          <label for="login-email">Email</label>
+          <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email" required />
+        </div>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" placeholder="Your password" autocomplete="current-password" required />
+        </div>
+        <button type="submit" class="btn btn-primary auth-submit" id="login-btn">Log in</button>
+      </form>
+
+      <!-- Sign up -->
+      <form id="signup-form" class="auth-form hidden" onsubmit="handleSignup(event)" novalidate>
+        <div class="form-group">
+          <label for="signup-email">Email</label>
+          <input type="email" id="signup-email" placeholder="you@example.com" autocomplete="email" required />
+        </div>
+        <div class="form-group">
+          <label for="signup-password">Password</label>
+          <input type="password" id="signup-password" placeholder="At least 8 characters" autocomplete="new-password" required />
+        </div>
+        <div class="form-group">
+          <label for="signup-confirm">Confirm password</label>
+          <input type="password" id="signup-confirm" placeholder="Repeat your password" autocomplete="new-password" required />
+        </div>
+        <button type="submit" class="btn btn-primary auth-submit" id="signup-btn">Create account</button>
+      </form>
+
+      <p class="auth-privacy">🔒 Your entries are private and stored on your own server.</p>
+    </div>
+  </div>
+
+
+  <!-- =============================================================
+       PAYMENT WALL
+       Shown after login when user hasn't paid yet.
+  ============================================================== -->
+  <div id="payment-wall" class="auth-overlay hidden" aria-modal="true" role="dialog" aria-label="Unlock ReflectAI">
+    <div class="auth-card payment-card">
+      <button class="payment-wall-close" onclick="closePaymentWall()" aria-label="Close">✕</button>
+      <div class="auth-logo">🌿 <strong>Reflect</strong>AI</div>
+      <h2 class="payment-title">Subscribe to ReflectAI</h2>
+      <p class="payment-price">₦3,000<span class="payment-price-note">/month · cancel anytime</span></p>
+
+      <ul class="payment-features">
+        <li><span>✦</span> Unlimited private journal entries</li>
+        <li><span>🤖</span> AI reflection prompts after every entry</li>
+        <li><span>📊</span> Weekly AI insight summaries</li>
+        <li><span>🎯</span> Goal setting &amp; AI check-ins</li>
+        <li><span>📈</span> Mood trend chart</li>
+        <li><span>🔒</span> Stored privately on your own server</li>
+      </ul>
+
+      <div class="payment-options">
+        <div class="payment-option">
+          <p class="payment-option-label">Nigeria &amp; Africa</p>
+          <button class="btn btn-primary btn-paystack" id="paystack-pay-btn" onclick="openPaystack()">
+            Subscribe with Paystack — ₦3,000/month
+          </button>
+        </div>
+        <div class="payment-divider"><span>or</span></div>
+        <div class="payment-option">
+          <p class="payment-option-label">International</p>
+          <button class="btn btn-secondary btn-stripe" id="stripe-pay-btn" onclick="openStripe()">
+            Subscribe with Stripe — $5/month
+          </button>
+        </div>
+      </div>
+      <p class="payment-security">🔒 Secured by <strong>Paystack</strong> &amp; <strong>Stripe</strong> · Cancel anytime</p>
+      <div class="payment-logout-row">
+        <button class="btn btn-ghost btn-sm" onclick="handleLogout()">Log out</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- =============================================================
+       UPGRADE MODAL
+       Shown when a free user taps a Pro-gated feature.
+  ============================================================== -->
+  <div id="upgrade-modal" class="modal-overlay hidden" aria-modal="true" role="dialog" aria-label="Upgrade to Pro">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeUpgradeModal()" aria-label="Close">✕</button>
+      <div class="pro-badge-large">PRO</div>
+      <h2>Upgrade to ReflectAI Pro</h2>
+      <p class="modal-subtitle">Unlock AI-powered tools that turn your journal into a growth engine.</p>
+
+      <ul class="plan-feature-list">
+        <li><span class="feat-check">✦</span> Everything in Free</li>
+        <li><span class="feat-check">📊</span> Weekly AI insight summaries</li>
+        <li><span class="feat-check">🎯</span> Goal setting &amp; tracking</li>
+        <li><span class="feat-check">🤖</span> AI goal check-ins from your journal</li>
+        <li><span class="feat-check">📤</span> Journal export <em>(coming soon)</em></li>
+      </ul>
+
+      <button class="btn btn-primary upgrade-cta" id="upgrade-btn" onclick="handleUpgrade()">
+        Upgrade Now — $9 / month
+      </button>
+      <p class="upgrade-demo-note">
+        Demo mode: clicking "Upgrade Now" simulates a Pro upgrade — no payment required.
+      </p>
+    </div>
+  </div>
+
+
+  <!-- =============================================================
+       NAVIGATION
+  ============================================================== -->
+  <nav>
+    <div class="container nav-inner">
+
+      <a href="#hero" class="logo" aria-label="ReflectAI home">
+        🌿 <span class="logo-word">Reflect<strong>AI</strong></span>
+      </a>
+
+      <div class="nav-links" role="navigation" aria-label="Page sections">
+        <a href="#journal-section">Journal</a>
+        <a href="#weekly-section">Weekly</a>
+        <a href="#goals-section">Goals</a>
+        <a href="#history-section">History</a>
+      </div>
+
+      <div class="nav-right">
+        <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" aria-label="Switch to dark mode" title="Toggle dark mode">
+          <span class="theme-icon" aria-hidden="true">🌙</span>
+        </button>
+
+        <!-- Shown after login -->
+        <div class="nav-user hidden" id="nav-user">
+          <span class="plan-badge" id="nav-plan-badge">FREE</span>
+          <a href="#account-section" class="nav-account-link">👤 My Account</a>
+          <button class="btn btn-ghost nav-logout" onclick="handleLogout()">Log out</button>
+        </div>
+      </div>
+
+    </div>
+  </nav>
+
+
+  <!-- =============================================================
+       HERO
+  ============================================================== -->
+  <section id="hero" aria-label="Introduction">
+    <div class="container">
+      <div class="hero-eyebrow">🌱 Your personal journaling companion</div>
+      <h1>Your daily space to<br /><em>reflect &amp; grow</em></h1>
+      <div class="hero-social-proof">
+        <div class="social-avatars" aria-hidden="true">
+          <span class="avatar av-1">A</span>
+          <span class="avatar av-2">T</span>
+          <span class="avatar av-3">K</span>
+          <span class="avatar av-4">M</span>
+        </div>
+        <p class="social-proof-text">Join <strong>200+ students and young professionals</strong> already reflecting daily.</p>
+      </div>
+      <p class="hero-tagline">
+        Write freely. Let AI transform your words into personalised
+        reflection prompts, weekly insights, and a story of your progress.
+      </p>
+      <div class="hero-cta-group">
+        <button class="btn btn-primary btn-hero" id="hero-cta-btn" onclick="handleHeroCta()">
+          Start Journaling Free →
+        </button>
+        <p class="hero-cta-sub">Cancel anytime · No contracts · Billed monthly via Paystack</p>
+      </div>
+      <div class="hero-features" role="list">
+        <span class="badge" role="listitem">✦ AI Reflection Prompts</span>
+        <span class="badge" role="listitem">📊 Weekly Insights</span>
+        <span class="badge" role="listitem">🎯 Goal Tracking</span>
+        <span class="badge" role="listitem">🔒 Private &amp; Secure</span>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- =============================================================
+       MOOD TREND SECTION  (hidden until entries with mood exist)
+  ============================================================== -->
+  <section id="mood-section" class="main-section hidden" aria-label="Mood trends">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-label">Insights</span>
+        <h2>Mood Trends</h2>
+        <p class="text-muted">How your emotional state has shifted across your recent entries.</p>
+      </div>
+      <div class="mood-chart-card reveal reveal-delay-1">
+        <canvas id="mood-chart-canvas" class="mood-chart-canvas" role="img" aria-label="Mood trend line chart"></canvas>
+        <div id="mood-frequency" class="mood-frequency" aria-label="Mood breakdown"></div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- =============================================================
+       JOURNAL SECTION
+  ============================================================== -->
+  <section id="journal-section" class="main-section" aria-label="Write today's journal entry">
+    <div class="container">
+
+      <div class="journal-top reveal">
+        <div class="section-header">
+          <span class="section-label">Step 1</span>
+          <h2>Today's Entry</h2>
+          <p class="text-muted">Write anything on your mind — thoughts, wins, challenges, feelings.</p>
+        </div>
+
+        <!-- Streak widget -->
+        <div class="streak-widget" id="streak-widget" aria-label="Writing streak">
+          <div class="streak-flame" aria-hidden="true">🔥</div>
+          <div class="streak-info">
+            <div class="streak-count-row">
+              <span class="streak-number" id="streak-number">0</span>
+              <span class="streak-unit">day streak</span>
+            </div>
+            <p class="streak-message" id="streak-message">Start your streak today!</p>
+          </div>
+        </div>
+      </div>
+
+      <p id="today-date" aria-live="polite"></p>
+
+      <form id="journal-form" novalidate class="reveal reveal-delay-1">
+
+        <!-- Mood selector -->
+        <div class="mood-selector" role="group" aria-label="How are you feeling today?">
+          <span class="mood-selector-label">How are you feeling?</span>
+          <div class="mood-options">
+            <button type="button" class="mood-btn" data-mood="motivated" onclick="selectMood('motivated')">
+              <span class="mood-emoji" aria-hidden="true">🚀</span><span class="mood-name">Motivated</span>
+            </button>
+            <button type="button" class="mood-btn" data-mood="happy" onclick="selectMood('happy')">
+              <span class="mood-emoji" aria-hidden="true">😊</span><span class="mood-name">Happy</span>
+            </button>
+            <button type="button" class="mood-btn" data-mood="grateful" onclick="selectMood('grateful')">
+              <span class="mood-emoji" aria-hidden="true">🙏</span><span class="mood-name">Grateful</span>
+            </button>
+            <button type="button" class="mood-btn" data-mood="tired" onclick="selectMood('tired')">
+              <span class="mood-emoji" aria-hidden="true">😴</span><span class="mood-name">Tired</span>
+            </button>
+            <button type="button" class="mood-btn" data-mood="anxious" onclick="selectMood('anxious')">
+              <span class="mood-emoji" aria-hidden="true">😰</span><span class="mood-name">Anxious</span>
+            </button>
+            <button type="button" class="mood-btn" data-mood="sad" onclick="selectMood('sad')">
+              <span class="mood-emoji" aria-hidden="true">😢</span><span class="mood-name">Sad</span>
+            </button>
+            <button type="button" class="mood-btn" data-mood="overwhelmed" onclick="selectMood('overwhelmed')">
+              <span class="mood-emoji" aria-hidden="true">😵</span><span class="mood-name">Overwhelmed</span>
+            </button>
+          </div>
+        </div>
+
+        <textarea
+          id="journal-input"
+          class="journal-textarea"
+          placeholder="How was your day? What's on your mind? Write freely — there are no rules here…"
+          maxlength="3000"
+          aria-label="Journal entry textarea"
+          aria-required="true"
+        ></textarea>
+        <div class="form-footer">
+          <div class="form-footer-left">
+            <span id="char-count" aria-live="polite">0 words</span>
+            <button type="button" class="btn-save-draft" onclick="saveDraft()" title="Save your draft so it survives a closed tab">Save draft</button>
+            <span id="draft-indicator" class="draft-indicator" aria-live="polite"></span>
+          </div>
+          <button type="submit" class="btn btn-primary" id="submit-btn">Get Reflection Prompts &rarr;</button>
+        </div>
+        <p id="free-entry-counter" class="free-entry-counter hidden" aria-live="polite"></p>
+      </form>
+
+      <div id="prompts-section" class="hidden" aria-live="polite" aria-label="AI reflection prompts">
+        <p class="prompts-heading">✦ Your Personalised Prompts</p>
+        <div id="prompts-loader" class="loader hidden" role="status">
+          <div class="spinner" aria-hidden="true"></div>
+          Thinking about your entry…
+        </div>
+        <div id="prompts-error" class="error-msg hidden" role="alert"></div>
+        <div id="prompts-result" class="hidden">
+          <div class="prompts-grid" id="prompts-grid"></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- =============================================================
+       WEEKLY INSIGHT  (Pro feature)
+  ============================================================== -->
+  <section id="weekly-section" class="main-section" aria-label="Weekly insight summary">
+    <div class="container">
+
+      <div class="section-header reveal">
+        <span class="section-label">Pro — Weekly Digest</span>
+        <h2>Weekly Insight</h2>
+        <p class="text-muted">An AI-generated reflection on your past entries — patterns, growth moments, and a suggestion for the week ahead.</p>
+      </div>
+
+      <!-- Free-user lock overlay -->
+      <div id="weekly-lock" class="pro-lock hidden reveal reveal-delay-1">
+        <div class="pro-lock-inner">
+          <span class="pro-lock-icon">📊</span>
+          <h3>Weekly Insight is a Pro feature</h3>
+          <p>Upgrade to unlock AI-powered summaries of your journaling patterns each week.</p>
+          <button class="btn btn-primary" onclick="showUpgradeModal()">Upgrade to Pro &rarr;</button>
+        </div>
+      </div>
+
+      <!-- Pro-user content -->
+      <div id="weekly-content" class="hidden">
+        <div class="insight-card reveal reveal-delay-1">
+          <div id="insight-loader" class="loader hidden" role="status">
+            <div class="spinner" aria-hidden="true"></div>
+            Analysing your recent entries…
+          </div>
+          <div id="insight-error" class="error-msg hidden" role="alert"></div>
+          <p id="insight-text" class="placeholder-text" aria-live="polite">
+            Click "Generate Insight" below to receive a personalised weekly summary based on your recent entries.
+          </p>
+          <div class="insight-footer">
+            <span id="insight-meta" class="insight-meta">Based on your last 7 entries</span>
+            <button class="btn btn-secondary" id="generate-insight-btn" onclick="generateWeeklyInsight()">Generate Insight</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- =============================================================
+       GOALS  (Pro feature)
+  ============================================================== -->
+  <section id="goals-section" class="main-section" aria-label="Goal setting and tracking">
+    <div class="container">
+
+      <div class="section-header reveal">
+        <span class="section-label">Pro — Goals</span>
+        <h2>Goals &amp; Tracking</h2>
+        <p class="text-muted">Set meaningful goals and let your journal check in on your progress.</p>
+      </div>
+
+      <!-- Free-user lock -->
+      <div id="goals-lock" class="pro-lock hidden reveal reveal-delay-1">
+        <div class="pro-lock-inner">
+          <span class="pro-lock-icon">🎯</span>
+          <h3>Goal Tracking is a Pro feature</h3>
+          <p>Upgrade to set goals, track progress, and get AI check-ins drawn from your journal entries.</p>
+          <button class="btn btn-primary" onclick="showUpgradeModal()">Upgrade to Pro &rarr;</button>
+        </div>
+      </div>
+
+      <!-- Pro-user content -->
+      <div id="goals-content" class="hidden">
+
+        <form id="goal-form" class="goal-form reveal" onsubmit="handleAddGoal(event)" novalidate>
+          <div class="goal-form-row">
+            <input
+              type="text"
+              id="goal-title"
+              class="goal-input"
+              placeholder="What do you want to achieve? e.g. Read 12 books this year"
+              maxlength="100"
+              aria-label="Goal title"
+            />
+            <input
+              type="date"
+              id="goal-target-date"
+              class="goal-input goal-date-input"
+              aria-label="Target date (optional)"
+            />
+            <button type="submit" class="btn btn-primary" id="add-goal-btn">Add Goal</button>
+          </div>
+          <textarea
+            id="goal-description"
+            class="goal-desc-input"
+            placeholder="Add more detail (optional)…"
+            maxlength="500"
+            rows="2"
+            aria-label="Goal description"
+          ></textarea>
+        </form>
+
+        <div id="goals-list" class="goals-list" aria-live="polite"></div>
+
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- =============================================================
+       HISTORY
+  ============================================================== -->
+  <section id="history-section" class="main-section" aria-label="Journal entry history">
+    <div class="container">
+      <div class="history-controls section-header reveal">
+        <div>
+          <span class="section-label">Archive</span>
+          <h2>Entry History</h2>
+          <p class="text-muted">All your past entries, stored privately on your account.</p>
+        </div>
+        <button class="btn btn-secondary" id="clear-btn" onclick="confirmClearHistory()" style="flex-shrink:0;align-self:flex-start;" aria-label="Clear all entries">
+          Clear All
+        </button>
+      </div>
+      <div id="history-container" aria-live="polite"></div>
+    </div>
+  </section>
+
+
+  <!-- =============================================================
+       ACCOUNT  (minimal section — mainly useful on mobile)
+  ============================================================== -->
+  <section id="account-section" class="main-section" aria-label="Account settings">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="section-label">Account</span>
+        <h2>Your Account</h2>
+      </div>
+      <div class="account-card reveal reveal-delay-1">
+        <div class="account-info">
+          <p class="account-email" id="account-email"></p>
+          <div class="account-plan-row">
+            <span class="plan-badge" id="account-plan-badge">FREE</span>
+            <span class="account-plan-label" id="account-plan-label">Free plan</span>
+          </div>
+        </div>
+        <div id="subscription-status-row" class="subscription-status-row hidden">
+          <span id="subscription-status-text" class="subscription-status-text"></span>
+          <button id="subscription-cancel-btn" class="btn btn-sm btn-ghost-danger" onclick="cancelSubscription()" style="display:none">Cancel subscription</button>
+          <button id="subscription-resubscribe-btn" class="btn btn-sm btn-primary" onclick="openPaystack()" style="display:none">Resubscribe</button>
+        </div>
+        <div class="account-actions">
+          <button class="btn btn-secondary" id="account-upgrade-btn" onclick="showUpgradeModal()">Upgrade to Pro</button>
+          <button class="btn btn-ghost" onclick="handleLogout()">Log out</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- =============================================================
+       FOOTER
+  ============================================================== -->
+  <footer>
+    <div class="container">
+      <p>ReflectAI &mdash; Built with the <a href="https://www.anthropic.com" target="_blank" rel="noopener">Anthropic Claude API</a></p>
+      <p>Your entries are stored on your private account. Only submitted text is sent to the AI.</p>
+    </div>
+  </footer>
+
+
+  <!-- =============================================================
+       MOBILE BOTTOM NAV
+  ============================================================== -->
+  <nav class="mobile-nav" aria-label="Mobile navigation">
+    <div class="mobile-nav-inner">
+      <a href="#journal-section" class="mobile-nav-link">
+        <span class="nav-icon">✍️</span>Journal
+      </a>
+      <a href="#weekly-section" class="mobile-nav-link">
+        <span class="nav-icon">📊</span>Weekly
+      </a>
+      <a href="#goals-section" class="mobile-nav-link">
+        <span class="nav-icon">🎯</span>Goals
+      </a>
+      <a href="#account-section" class="mobile-nav-link">
+        <span class="nav-icon">👤</span>Account
+      </a>
+    </div>
+  </nav>
+
+
+  <!-- Paystack inline JS — loads payment popup. Safe to fail silently (handled in app.js) -->
+  <script src="https://js.paystack.co/v1/inline.js"></script>
+  <script src="app.js"></script>
+
+</body>
+</html>

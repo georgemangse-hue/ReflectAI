@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ReflectAI – Free Demo · Try AI journaling</title>
+  <meta name="description" content="Try ReflectAI free — write a journal entry and get a personalised AI reflection prompt instantly. No account needed." />
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    (function () {
+      var saved = localStorage.getItem('reflectai_theme');
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', saved || (prefersDark ? 'dark' : 'light'));
+    })();
+  </script>
+  <style>
+    .demo-hero {
+      padding: 4rem 0 2.5rem;
+      text-align: center;
+    }
+    .demo-hero h1 {
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      margin: 0.5rem 0 0.75rem;
+    }
+    .demo-hero p {
+      color: var(--text-muted);
+      font-size: 1rem;
+      max-width: 480px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+    .demo-card {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      margin: 2rem 0 1rem;
+    }
+    .demo-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    #demo-word-count {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .demo-loader {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      padding: 1.5rem 0;
+      justify-content: center;
+    }
+    .demo-result {
+      margin-bottom: 1.5rem;
+      animation: fadeSlideUp 0.4s var(--ease-out);
+    }
+    .demo-prompt-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--primary);
+      border-radius: var(--radius-sm);
+      padding: 1.4rem 1.6rem;
+      box-shadow: var(--shadow);
+    }
+    .demo-try-again {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 0.75rem;
+      font-style: italic;
+      text-align: center;
+    }
+    .demo-cta {
+      background: var(--primary-light);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2.25rem 2rem;
+      text-align: center;
+      margin-top: 2.5rem;
+      margin-bottom: 3rem;
+    }
+    .demo-cta-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 0.6rem;
+    }
+    .demo-cta h2 {
+      font-size: clamp(1.1rem, 2.5vw, 1.4rem);
+      margin-bottom: 0.5rem;
+      color: var(--text);
+    }
+    .demo-cta-sub {
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.65;
+    }
+    .demo-features {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.75rem;
+    }
+    .demo-cta .btn-primary {
+      min-width: 220px;
+      font-size: 1rem;
+      padding: 0.9rem 2rem;
+    }
+    @media (max-width: 600px) {
+      .demo-hero { padding: 2.5rem 0 1.5rem; }
+      .demo-footer { flex-direction: column; align-items: stretch; }
+      .demo-footer .btn { justify-content: center; }
+      .demo-cta { padding: 1.75rem 1.25rem; }
+      .demo-cta .btn-primary { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="container nav-inner">
+      <a href="/" class="logo" aria-label="ReflectAI home">
+        🌿 <span class="logo-word">Reflect<strong>AI</strong></span>
+      </a>
+      <div class="nav-right">
+        <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">
+          <span class="theme-icon" aria-hidden="true">🌙</span>
+        </button>
+        <a href="/" class="btn btn-secondary btn-sm">Log in</a>
+        <a href="/" class="btn btn-primary btn-sm">Sign up</a>
+      </div>
+    </div>
+  </nav>
+
+
+  <div class="demo-hero">
+    <div class="container">
+      <span class="section-label">Free Demo — No account needed</span>
+      <h1>See AI journaling <em>in action</em></h1>
+      <p>Write anything on your mind and get a personalised AI reflection prompt instantly.</p>
+    </div>
+  </div>
+
+
+  <main>
+    <div class="container" style="max-width: 680px;">
+
+      <div class="demo-card">
+        <textarea
+          id="demo-input"
+          class="journal-textarea"
+          placeholder="How was your day? What's been on your mind? Write freely — there are no rules here…"
+          maxlength="2000"
+          aria-label="Journal entry"
+          aria-required="true"
+        ></textarea>
+        <div class="demo-footer">
+          <span id="demo-word-count">0 words</span>
+          <button class="btn btn-primary" id="demo-btn" onclick="getPrompt()">
+            Get my reflection prompt →
+          </button>
+        </div>
+      </div>
+
+      <div id="demo-loader" class="demo-loader hidden" role="status">
+        <div class="spinner" aria-hidden="true"></div>
+        Thinking about your entry…
+      </div>
+
+      <div id="demo-error" class="error-msg hidden" role="alert"></div>
+
+      <div id="demo-result" class="demo-result hidden" aria-live="polite">
+        <p class="prompts-heading">✦ Your Personalised Prompt</p>
+        <div class="demo-prompt-card">
+          <div class="prompt-category" id="demo-category"></div>
+          <p class="prompt-text" id="demo-prompt"></p>
+        </div>
+        <p class="demo-try-again">Edit your entry and generate again — every entry gets a different prompt.</p>
+      </div>
+
+
+      <div class="demo-cta">
+        <div class="demo-cta-label">Want more?</div>
+        <h2>Unlock all features and save your entries</h2>
+        <p class="demo-cta-sub">
+          Subscribe for <strong>₦3,000/month</strong> and get 3 AI prompts per entry,
+          weekly insights, goal tracking, mood trends, and a private journal saved to your account.
+        </p>
+        <div class="demo-features">
+          <span class="badge">✦ 3 AI Prompts per entry</span>
+          <span class="badge">📊 Weekly AI Insights</span>
+          <span class="badge">🎯 Goal Tracking</span>
+          <span class="badge">📈 Mood Trends</span>
+          <span class="badge">🔒 Private &amp; Saved</span>
+        </div>
+        <a href="/" class="btn btn-primary">Start journaling free →</a>
+      </div>
+
+    </div>
+  </main>
+
+
+  <footer>
+    <div class="container">
+      <p>ReflectAI &mdash; Built with the <a href="https://www.anthropic.com" target="_blank" rel="noopener">Anthropic Claude API</a></p>
+      <p>Your demo entry is not saved or stored.</p>
+    </div>
+  </footer>
+
+
+  <script>
+    /* ── Theme ─────────────────────────────────────── */
+    function toggleTheme() {
+      const next = (document.documentElement.getAttribute('data-theme') || 'light') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('reflectai_theme', next);
+      document.querySelector('.theme-icon').textContent = next === 'dark' ? '☀️' : '🌙';
+    }
+    document.querySelector('.theme-icon').textContent =
+      document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙';
+
+    /* ── Textarea ──────────────────────────────────── */
+    const ta = document.getElementById('demo-input');
+
+    function autoResize() { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }
+    autoResize();
+
+    ta.addEventListener('input', () => {
+      autoResize();
+      const n = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
+      document.getElementById('demo-word-count').textContent = n === 1 ? '1 word' : `${n} words`;
+    });
+
+    /* ── Helpers ───────────────────────────────────── */
+    function escapeHTML(str) {
+      return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('demo-error');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    /* ── Main ──────────────────────────────────────── */
+    async function getPrompt() {
+      const text = ta.value.trim();
+      const wordCount = text ? text.split(/\s+/).length : 0;
+
+      if (wordCount < 5) {
+        showError('Please write a little more — at least a sentence or two so the AI has something to reflect on.');
+        return;
+      }
+
+      const btn    = document.getElementById('demo-btn');
+      const loader = document.getElementById('demo-loader');
+      const result = document.getElementById('demo-result');
+      const errEl  = document.getElementById('demo-error');
+
+      btn.disabled = true;
+      btn.textContent = 'Thinking…';
+      loader.classList.remove('hidden');
+      result.classList.add('hidden');
+      errEl.classList.add('hidden');
+
+      try {
+        const res  = await fetch('/api/demo/reflect', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ entry: text })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showError(data.error || 'Something went wrong. Please try again.');
+          return;
+        }
+
+        document.getElementById('demo-category').textContent = escapeHTML(data.category);
+        document.getElementById('demo-prompt').textContent   = escapeHTML(data.prompt);
+        result.classList.remove('hidden');
+        result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } catch {
+        showError('Could not reach the server. Please try again.');
+      } finally {
+        loader.classList.add('hidden');
+        btn.disabled    = false;
+        btn.textContent = 'Get my reflection prompt →';
+      }
+    }
+  </script>
+
+</body>
+</html>

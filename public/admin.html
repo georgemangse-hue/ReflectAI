@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ReflectAI — Admin</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0d1117; color: #e2e8f0; min-height: 100vh; }
+
+    /* ── Login ─────────────────────────────────────── */
+    .login-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1rem; }
+    .login-card { background: #161b22; border: 1px solid #30363d; border-radius: 14px; padding: 2.25rem 2rem; width: 100%; max-width: 380px; }
+    .login-logo  { font-size: 1.1rem; font-weight: 700; color: #4dba7e; margin-bottom: 0.3rem; }
+    .login-title { font-size: 1.35rem; font-weight: 800; color: #fff; margin-bottom: 0.3rem; }
+    .login-sub   { font-size: 0.83rem; color: #8b949e; margin-bottom: 1.75rem; }
+    .fg { margin-bottom: 1rem; }
+    .fg label { display: block; font-size: 0.78rem; font-weight: 600; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem; }
+    .fg input  { width: 100%; padding: 0.65rem 0.9rem; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; color: #e2e8f0; font-size: 0.9rem; outline: none; transition: border-color 0.15s; }
+    .fg input:focus { border-color: #4dba7e; }
+    .btn-login { width: 100%; padding: 0.8rem; background: #2d8653; color: #fff; border: none; border-radius: 8px; font-size: 0.92rem; font-weight: 700; cursor: pointer; transition: background 0.15s; }
+    .btn-login:hover { background: #3a9e66; }
+    .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
+    .login-err { color: #f87171; font-size: 0.82rem; margin-top: 0.6rem; display: none; }
+
+    /* ── Dashboard shell ────────────────────────────── */
+    .shell { display: none; flex-direction: column; min-height: 100vh; }
+
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1.75rem; background: #161b22; border-bottom: 1px solid #30363d; position: sticky; top: 0; z-index: 10; }
+    .topbar-brand { font-size: 0.98rem; font-weight: 700; color: #4dba7e; letter-spacing: -0.01em; }
+    .topbar-actions { display: flex; gap: 0.5rem; }
+    .btn-top { padding: 0.38rem 0.8rem; border: 1px solid #30363d; border-radius: 6px; background: transparent; color: #8b949e; font-size: 0.78rem; cursor: pointer; transition: background 0.12s, color 0.12s; }
+    .btn-top:hover { background: #21262d; color: #e2e8f0; }
+
+    .content { padding: 1.75rem 1.75rem 3rem; max-width: 1200px; width: 100%; margin: 0 auto; }
+    .page-title { font-size: 1.5rem; font-weight: 800; color: #fff; margin-bottom: 1.5rem; }
+
+    /* ── Stats cards ────────────────────────────────── */
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.9rem; margin-bottom: 1.75rem; }
+    .stat-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 1.2rem 1rem; }
+    .stat-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #8b949e; margin-bottom: 0.5rem; }
+    .stat-val { font-size: 2rem; font-weight: 800; line-height: 1; color: #fff; }
+    .stat-val.c-green  { color: #4dba7e; }
+    .stat-val.c-yellow { color: #d29922; }
+    .stat-val.c-red    { color: #f87171; }
+    .stat-val.c-muted  { color: #8b949e; }
+
+    /* ── Table card ─────────────────────────────────── */
+    .table-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; overflow: hidden; }
+    .table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.9rem 1.25rem; border-bottom: 1px solid #21262d; flex-wrap: wrap; }
+    .table-toolbar-left { display: flex; align-items: center; gap: 0.75rem; }
+    .table-heading { font-size: 0.92rem; font-weight: 700; color: #fff; }
+    .table-count-pill { font-size: 0.72rem; background: #21262d; color: #8b949e; padding: 0.18rem 0.55rem; border-radius: 20px; }
+    .search-input { padding: 0.4rem 0.8rem; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e2e8f0; font-size: 0.82rem; outline: none; width: 210px; transition: border-color 0.12s; }
+    .search-input:focus { border-color: #4dba7e; }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { padding: 0.6rem 1rem; text-align: left; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #8b949e; border-bottom: 1px solid #21262d; white-space: nowrap; }
+    tbody td { padding: 0.72rem 1rem; font-size: 0.83rem; border-bottom: 1px solid #1c2128; white-space: nowrap; color: #c9d1d9; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: #1c2128; }
+    .td-email { color: #e2e8f0; font-weight: 500; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ── Status badges ──────────────────────────────── */
+    .badge { display: inline-flex; align-items: center; gap: 0.28rem; padding: 0.18rem 0.55rem; border-radius: 20px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+    .b-active   { background: rgba(77,186,126,0.14);  color: #4dba7e; }
+    .b-lifetime { background: rgba(77,186,126,0.1);   color: #4dba7e; }
+    .b-cancel   { background: rgba(210,153,34,0.14);  color: #d29922; }
+    .b-expired  { background: rgba(248,113,113,0.12); color: #f87171; }
+    .b-free     { background: rgba(139,148,158,0.12); color: #8b949e; }
+
+    .no-data { padding: 3rem; text-align: center; color: #8b949e; font-size: 0.88rem; }
+
+    @media (max-width: 640px) {
+      .topbar, .content { padding-left: 1rem; padding-right: 1rem; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .search-input { width: 140px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Login ─────────────────────────────────────── -->
+  <div class="login-wrap" id="login-wrap">
+    <div class="login-card">
+      <div class="login-logo">🌿 ReflectAI</div>
+      <h1 class="login-title">Admin Dashboard</h1>
+      <p class="login-sub">Enter your admin key to view users and subscriptions.</p>
+      <form onsubmit="handleLogin(event)">
+        <div class="fg">
+          <label for="key-input">Admin Key</label>
+          <input type="password" id="key-input" placeholder="Paste your ADMIN_SECRET…" autocomplete="off" required />
+        </div>
+        <button type="submit" class="btn-login" id="login-btn">Sign in →</button>
+        <p class="login-err" id="login-err"></p>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ── Dashboard ─────────────────────────────────── -->
+  <div class="shell" id="shell">
+    <header class="topbar">
+      <span class="topbar-brand">🌿 ReflectAI Admin</span>
+      <div class="topbar-actions">
+        <button class="btn-top" onclick="refresh()">↻ Refresh</button>
+        <button class="btn-top" onclick="signOut()">Sign out</button>
+      </div>
+    </header>
+
+    <main class="content">
+      <h1 class="page-title">Users &amp; Subscriptions</h1>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Total Users</div>
+          <div class="stat-val" id="s-total">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active Subs</div>
+          <div class="stat-val c-green" id="s-active">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Cancelling</div>
+          <div class="stat-val c-yellow" id="s-cancel">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Expired</div>
+          <div class="stat-val c-red" id="s-expired">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Free (unpaid)</div>
+          <div class="stat-val c-muted" id="s-free">—</div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-toolbar">
+          <div class="table-toolbar-left">
+            <span class="table-heading">All Users</span>
+            <span class="table-count-pill" id="tbl-count"></span>
+          </div>
+          <input class="search-input" id="search" placeholder="Search email…" oninput="filter()" />
+        </div>
+        <div class="table-wrap">
+          <div id="tbl-body"><div class="no-data">Loading…</div></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+
+  <script>
+    let allUsers = [];
+
+    /* ── Helpers ───────────────────────────────────── */
+    const $ = id => document.getElementById(id);
+    const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const key = () => sessionStorage.getItem('ra_admin') || '';
+    const fmtDate = ts => ts ? new Date(ts).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+
+    function statusBadge(u) {
+      const now = Date.now();
+      if (!u.paid) return `<span class="badge b-free">Free</span>`;
+      if (!u.subscriptionExpiry) return `<span class="badge b-lifetime">● Lifetime</span>`;
+      if (u.subscriptionStatus === 'active'       && u.subscriptionExpiry > now) return `<span class="badge b-active">● Active</span>`;
+      if (u.subscriptionStatus === 'non-renewing' && u.subscriptionExpiry > now) return `<span class="badge b-cancel">◑ Cancelling</span>`;
+      return `<span class="badge b-expired">✕ Expired</span>`;
+    }
+
+    /* ── Fetch ─────────────────────────────────────── */
+    async function fetchData() {
+      const res = await fetch('/api/admin/users', { headers: { Authorization: 'Bearer ' + key() } });
+      if (!res.ok) throw new Error(res.status === 401 ? 'bad_key' : 'fetch_fail');
+      return res.json();
+    }
+
+    /* ── Render ────────────────────────────────────── */
+    function renderStats(s) {
+      $('s-total').textContent   = s.total;
+      $('s-active').textContent  = s.active;
+      $('s-cancel').textContent  = s.nonRenewing;
+      $('s-expired').textContent = s.expired;
+      $('s-free').textContent    = s.free;
+    }
+
+    function renderTable(users) {
+      $('tbl-count').textContent = users.length + ' user' + (users.length !== 1 ? 's' : '');
+      if (!users.length) { $('tbl-body').innerHTML = '<div class="no-data">No users found.</div>'; return; }
+      $('tbl-body').innerHTML = `
+        <table>
+          <thead><tr>
+            <th>Email</th><th>Status</th><th>Plan</th>
+            <th>Renews / Expires</th><th>Entries</th><th>Joined</th>
+          </tr></thead>
+          <tbody>
+            ${users.map(u => `<tr>
+              <td class="td-email">${esc(u.email)}</td>
+              <td>${statusBadge(u)}</td>
+              <td>${esc(u.plan.toUpperCase())}</td>
+              <td>${fmtDate(u.subscriptionExpiry)}</td>
+              <td>${u.entryCount}</td>
+              <td>${fmtDate(u.createdAt)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    function showDashboard(data) {
+      $('login-wrap').style.display = 'none';
+      $('shell').style.display = 'flex';
+      allUsers = data.users;
+      renderStats(data.stats);
+      renderTable(allUsers);
+    }
+
+    /* ── Actions ───────────────────────────────────── */
+    function filter() {
+      const q = $('search').value.toLowerCase();
+      renderTable(q ? allUsers.filter(u => u.email.toLowerCase().includes(q)) : allUsers);
+    }
+
+    async function refresh() {
+      try { showDashboard(await fetchData()); }
+      catch { alert('Failed to refresh. You may need to sign in again.'); }
+    }
+
+    function signOut() {
+      sessionStorage.removeItem('ra_admin');
+      $('shell').style.display = 'none';
+      $('login-wrap').style.display = 'flex';
+      $('key-input').value = '';
+    }
+
+    /* ── Login ─────────────────────────────────────── */
+    async function handleLogin(e) {
+      e.preventDefault();
+      const k   = $('key-input').value.trim();
+      const btn = $('login-btn');
+      const err = $('login-err');
+      btn.disabled = true; btn.textContent = 'Signing in…';
+      err.style.display = 'none';
+      try {
+        sessionStorage.setItem('ra_admin', k);
+        showDashboard(await fetchData());
+      } catch (ex) {
+        sessionStorage.removeItem('ra_admin');
+        err.textContent = ex.message === 'bad_key' ? 'Invalid admin key.' : 'Could not reach server.';
+        err.style.display = 'block';
+      } finally { btn.disabled = false; btn.textContent = 'Sign in →'; }
+    }
+
+    /* ── Auto-login if key stored ───────────────────── */
+    if (key()) fetchData().then(showDashboard).catch(() => sessionStorage.removeItem('ra_admin'));
+  </script>
+
+</body>
+</html>
