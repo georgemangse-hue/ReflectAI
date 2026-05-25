@@ -35,10 +35,15 @@ const PAYSTACK_PLAN_CODE     = process.env.PAYSTACK_PLAN_CODE     || ''; // e.g.
 const STRIPE_SECRET_KEY      = process.env.STRIPE_SECRET_KEY      || '';
 const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY || '';
 const STRIPE_PRICE_ID        = process.env.STRIPE_PRICE_ID        || ''; // e.g. price_xxxxxxxx
-const STRIPE_WEBHOOK_SECRET  = process.env.STRIPE_WEBHOOK_SECRET  || '';
-const APP_URL                = process.env.APP_URL                || `http://localhost:${PORT}`;
+const STRIPE_WEBHOOK_SECRET      = process.env.STRIPE_WEBHOOK_SECRET      || '';
+const FLUTTERWAVE_PUBLIC_KEY     = process.env.FLUTTERWAVE_PUBLIC_KEY     || '';
+const FLUTTERWAVE_SECRET_KEY     = process.env.FLUTTERWAVE_SECRET_KEY     || '';
+const APP_URL                    = process.env.APP_URL                    || `http://localhost:${PORT}`;
 const ADMIN_SECRET           = process.env.ADMIN_SECRET           || crypto.randomBytes(16).toString('hex');
-const FREE_ENTRY_LIMIT    = 3;
+const FREE_ENTRY_LIMIT          = 3;
+const FREE_WEEKLY_INSIGHT_LIMIT = 1;
+const FREE_GOAL_LIMIT           = 1;
+const FREE_CHECKIN_LIMIT        = 1;
 
 // In-memory demo rate limiter — 5 prompts per IP per hour (resets on server restart)
 const demoRateLimit   = new Map();
@@ -440,9 +445,10 @@ const server = http.createServer(async (req, res) => {
 
     if (method === 'GET' && url === '/api/config') {
       return sendJSON(res, 200, {
-        paystackPublicKey:    PAYSTACK_PUBLIC_KEY,
-        paystackPlanCode:     PAYSTACK_PLAN_CODE,
-        stripePublishableKey: STRIPE_PUBLISHABLE_KEY
+        paystackPublicKey:     PAYSTACK_PUBLIC_KEY,
+        paystackPlanCode:      PAYSTACK_PLAN_CODE,
+        stripePublishableKey:  STRIPE_PUBLISHABLE_KEY,
+        flutterwavePublicKey:  FLUTTERWAVE_PUBLIC_KEY
       });
     }
 
@@ -557,6 +563,67 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* ==============================================================
+       PAYMENT — Flutterwave transaction verify
+    ============================================================== */
+    if (method === 'POST' && url === '/api/payment/verify-flutterwave') {
+      const user = requireAuth(req, res);
+      if (!user) return;
+      const { transaction_id } = await readBody(req);
+      if (!transaction_id) return sendJSON(res, 400, { error: 'Transaction ID is required.' });
+
+      const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+
+      if (!FLUTTERWAVE_SECRET_KEY) {
+        // Dev / test mode
+        updateUser(user.id, {
+          paid: true, plan: 'pro',
+          subscriptionStatus: 'active',
+          subscriptionExpiry: Date.now() + THIRTY_DAYS,
+          flwTransactionId:   String(transaction_id)
+        });
+        const updated = readJSON(USERS_FILE).find(u => u.id === user.id);
+        return sendJSON(res, 200, { ok: true, user: userShape(updated) });
+      }
+
+      // Verify with Flutterwave
+      let flwResult;
+      try {
+        flwResult = await new Promise((resolve, reject) => {
+          const options = {
+            hostname: 'api.flutterwave.com',
+            path:     `/v3/transactions/${encodeURIComponent(transaction_id)}/verify`,
+            method:   'GET',
+            headers:  { Authorization: `Bearer ${FLUTTERWAVE_SECRET_KEY}` }
+          };
+          const req2 = https.request(options, r => {
+            let body = '';
+            r.on('data', c => body += c);
+            r.on('end', () => { try { resolve(JSON.parse(body)); } catch { reject(new Error('Bad JSON')); } });
+          });
+          req2.on('error', reject);
+          req2.end();
+        });
+      } catch (err) {
+        return sendJSON(res, 502, { error: 'Could not reach Flutterwave. Please try again.' });
+      }
+
+      if (flwResult.status !== 'success' || flwResult.data?.status !== 'successful')
+        return sendJSON(res, 400, { error: 'Payment not successful. Please try again.' });
+      if ((flwResult.data?.amount || 0) < 5)
+        return sendJSON(res, 400, { error: 'Payment amount is insufficient (expected $5).' });
+
+      updateUser(user.id, {
+        paid: true, plan: 'pro',
+        subscriptionStatus: 'active',
+        subscriptionExpiry: Date.now() + THIRTY_DAYS,
+        flwTransactionId:   String(transaction_id),
+        flwCustomerId:      String(flwResult.data?.customer?.id || '')
+      });
+      const updated = readJSON(USERS_FILE).find(u => u.id === user.id);
+      return sendJSON(res, 200, { ok: true, user: userShape(updated) });
+    }
+
+    /* ==============================================================
        PAYMENT — cancel subscription
     ============================================================== */
     if (method === 'POST' && url === '/api/subscription/cancel') {
@@ -639,6 +706,49 @@ const server = http.createServer(async (req, res) => {
         if (email) {
           const u = findUserByEmail(email);
           if (u) updateUser(u.id, { subscriptionStatus: 'lapsed' });
+        }
+      }
+
+      res.writeHead(200); return res.end('OK');
+    }
+
+    /* ==============================================================
+       PAYMENT — Flutterwave webhook (handles renewals and failures)
+    ============================================================== */
+    if (method === 'POST' && url === '/api/webhook/flutterwave') {
+      const rawBody = await readRawBody(req);
+      const sig     = req.headers['verif-hash'];
+
+      // Verify hash if a secret is configured
+      if (FLUTTERWAVE_SECRET_KEY && sig !== FLUTTERWAVE_SECRET_KEY) {
+        res.writeHead(401); return res.end('Invalid signature');
+      }
+
+      let event;
+      try { event = JSON.parse(rawBody); } catch { res.writeHead(400); return res.end('Bad JSON'); }
+
+      const data = event.data || {};
+      const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+
+      if (event.event === 'charge.completed' && data.status === 'successful') {
+        const email = data.customer?.email;
+        if (email) {
+          const u = findUserByEmail(email);
+          if (u && u.paid) {
+            const currentExpiry = u.subscriptionExpiry || Date.now();
+            updateUser(u.id, {
+              subscriptionStatus: 'active',
+              subscriptionExpiry: Math.max(currentExpiry, Date.now()) + THIRTY_DAYS
+            });
+          }
+        }
+      }
+
+      if (event.event === 'subscription.cancelled') {
+        const email = data.customer?.email;
+        if (email) {
+          const u = findUserByEmail(email);
+          if (u) updateUser(u.id, { subscriptionStatus: 'non-renewing' });
         }
       }
 
@@ -957,8 +1067,14 @@ Available categories (pick the 3 that best fit): Feelings, Mindset, Growth, Next
     }
 
     if (method === 'POST' && url === '/api/weekly-insight') {
-      const user = requirePro(req, res);
+      const user = requireAuth(req, res);
       if (!user) return;
+      if (!isSubscriptionActive(user) && (user.weeklyInsightTrialUsed || 0) >= FREE_WEEKLY_INSIGHT_LIMIT) {
+        return sendJSON(res, 403, {
+          error: 'You\'ve used your free weekly insight preview. Subscribe for unlimited access.',
+          code: 'PRO_TRIAL_EXHAUSTED'
+        });
+      }
       if (!API_KEY) return sendJSON(res, 500, { error: 'ANTHROPIC_API_KEY is not configured.' });
 
       const entries = readJSON(entriesFile(user.id)).slice(0, 7);
@@ -978,21 +1094,33 @@ Structure:
 Voice: second person only ("you", "your"). Flowing prose, no bullets or headers. ~150–200 words. Let encouragement come from specificity, not cheerleading. Never say "amazing" or "you're doing great".`;
 
       const result = await callClaude([{ role: 'user', content: `Here are my journal entries from this past week:\n\n${formatted}` }], systemPrompt);
+      if (!isSubscriptionActive(user)) {
+        updateUser(user.id, { weeklyInsightTrialUsed: (user.weeklyInsightTrialUsed || 0) + 1 });
+      }
       return sendJSON(res, 200, { insight: result.content[0].text });
     }
 
     /* ==============================================================
-       GOALS  (pro only)
+       GOALS  (1 free trial goal; unlimited for pro)
     ============================================================== */
     if (method === 'GET' && url === '/api/goals') {
-      const user = requirePro(req, res);
+      const user = requireAuth(req, res);
       if (!user) return;
       return sendJSON(res, 200, { goals: readJSON(goalsFile(user.id)) });
     }
 
     if (method === 'POST' && url === '/api/goals') {
-      const user = requirePro(req, res);
+      const user = requireAuth(req, res);
       if (!user) return;
+      if (!isSubscriptionActive(user)) {
+        const existingGoals = readJSON(goalsFile(user.id));
+        if (existingGoals.length >= FREE_GOAL_LIMIT) {
+          return sendJSON(res, 403, {
+            error: 'Free accounts can set 1 goal. Subscribe to track unlimited goals.',
+            code: 'PRO_TRIAL_EXHAUSTED'
+          });
+        }
+      }
       const { title, description, targetDate } = await readBody(req);
       if (!title?.trim()) return sendJSON(res, 400, { error: 'Goal title is required.' });
 
@@ -1011,7 +1139,7 @@ Voice: second person only ("you", "your"). Flowing prose, no bullets or headers.
     if (goalIdMatch) {
       const goalId = goalIdMatch[1];
       if (method === 'PATCH') {
-        const user = requirePro(req, res);
+        const user = requireAuth(req, res);
         if (!user) return;
         const updates = await readBody(req);
         const goals   = readJSON(goalsFile(user.id));
@@ -1024,7 +1152,7 @@ Voice: second person only ("you", "your"). Flowing prose, no bullets or headers.
         return sendJSON(res, 200, { goal: goals[idx] });
       }
       if (method === 'DELETE') {
-        const user = requirePro(req, res);
+        const user = requireAuth(req, res);
         if (!user) return;
         const goals = readJSON(goalsFile(user.id));
         writeJSON(goalsFile(user.id), goals.filter(g => g.id !== goalId));
@@ -1034,8 +1162,14 @@ Voice: second person only ("you", "your"). Flowing prose, no bullets or headers.
 
     const checkinMatch = url.match(/^\/api\/goals\/([a-f0-9]+)\/checkin$/);
     if (method === 'POST' && checkinMatch) {
-      const user = requirePro(req, res);
+      const user = requireAuth(req, res);
       if (!user) return;
+      if (!isSubscriptionActive(user) && (user.goalCheckinTrialUsed || 0) >= FREE_CHECKIN_LIMIT) {
+        return sendJSON(res, 403, {
+          error: 'You\'ve used your free AI check-in. Subscribe for unlimited check-ins.',
+          code: 'PRO_TRIAL_EXHAUSTED'
+        });
+      }
       if (!API_KEY) return sendJSON(res, 500, { error: 'ANTHROPIC_API_KEY is not configured.' });
 
       const goalId  = checkinMatch[1];
@@ -1054,6 +1188,9 @@ Your check-in should note any specific evidence from the journal entries that re
 
       const userMsg = `My goal: "${goal.title}"${goal.description ? `\nDetails: ${goal.description}` : ''}${goal.targetDate ? `\nTarget date: ${goal.targetDate}` : ''}\n\nRecent journal entries:\n\n${formatted}`;
       const result  = await callClaude([{ role: 'user', content: userMsg }], systemPrompt);
+      if (!isSubscriptionActive(user)) {
+        updateUser(user.id, { goalCheckinTrialUsed: (user.goalCheckinTrialUsed || 0) + 1 });
+      }
       return sendJSON(res, 200, { checkin: result.content[0].text });
     }
 

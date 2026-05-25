@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir /s /b \"C:\\\\Users\\\\Admin\\\\Desktop\\\\Claude_Projects\\\\Journaling_App\")",
+      "Bash(node server.js)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(curl -s http://localhost:3000/style.css)",
+      "Bash(curl -s http://localhost:3000/app.js)"
+    ]
+  }
+}

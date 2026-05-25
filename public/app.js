@@ -56,7 +56,8 @@ const state = {
   selectedMood:        null,
   paystackKey:         '',
   planCode:            '',
-  stripePublishableKey: ''
+  stripePublishableKey: '',
+  flutterwaveKey:      ''
 };
 
 
@@ -136,7 +137,7 @@ async function api(method, path, body) {
   const data = await res.json().catch(() => ({}));
 
   if (res.status === 401) { clearAuthState(); showAuthOverlay(); return null; }
-  if (res.status === 403 && (data.code === 'PAYMENT_REQUIRED' || data.code === 'SUBSCRIPTION_EXPIRED' || data.code === 'ENTRY_LIMIT_REACHED')) {
+  if (res.status === 403 && (data.code === 'PAYMENT_REQUIRED' || data.code === 'SUBSCRIPTION_EXPIRED' || data.code === 'ENTRY_LIMIT_REACHED' || data.code === 'PRO_TRIAL_EXHAUSTED')) {
     showPaymentWall();
     return null;
   }
@@ -256,10 +257,16 @@ function applyUserUI(user) {
 }
 
 function applyProGates(isPro) {
-  document.getElementById('weekly-lock').classList.toggle('hidden',    isPro);
-  document.getElementById('weekly-content').classList.toggle('hidden', !isPro);
-  document.getElementById('goals-lock').classList.toggle('hidden',    isPro);
-  document.getElementById('goals-content').classList.toggle('hidden', !isPro);
+  // All users get trial access — hide the lock overlays, show the content
+  document.getElementById('weekly-lock').classList.add('hidden');
+  document.getElementById('weekly-content').classList.remove('hidden');
+  document.getElementById('goals-lock').classList.add('hidden');
+  document.getElementById('goals-content').classList.remove('hidden');
+
+  // Show trial notes only for free users
+  const weeklyNote = document.getElementById('weekly-trial-note');
+  if (weeklyNote) weeklyNote.classList.toggle('hidden', isPro);
+  updateGoalsTrialNote();
 }
 
 async function initAuth() {
@@ -281,17 +288,46 @@ function closePaymentWall()  { hidePaymentWall(); }
 
 
 /* ================================================================
-   5. PAYMENT — PAYSTACK
+   5. PAYMENT — PAYSTACK + FLUTTERWAVE
 ================================================================ */
-function showPaymentWall() { document.getElementById('payment-wall')?.classList.remove('hidden'); }
-function hidePaymentWall() { document.getElementById('payment-wall')?.classList.add('hidden');    }
+function isNigerianUser() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone === 'Africa/Lagos';
+}
+
+function applyPaymentWallRegion() {
+  const container = document.getElementById('payment-options-container');
+  if (!container) return;
+  const paystackOpt     = document.getElementById('payment-opt-paystack');
+  const flutterwaveOpt  = document.getElementById('payment-opt-flutterwave');
+  const divider         = container.querySelector('.payment-divider');
+  if (!paystackOpt || !flutterwaveOpt || !divider) return;
+
+  if (isNigerianUser()) {
+    // Nigerian users: Paystack first (primary), Flutterwave second (secondary)
+    container.append(paystackOpt, divider, flutterwaveOpt);
+    document.getElementById('paystack-pay-btn')?.classList.replace('btn-secondary', 'btn-primary');
+    document.getElementById('flutterwave-pay-btn')?.classList.replace('btn-primary', 'btn-secondary');
+  } else {
+    // International users: Flutterwave first (primary), Paystack second (secondary)
+    container.append(flutterwaveOpt, divider, paystackOpt);
+    document.getElementById('flutterwave-pay-btn')?.classList.replace('btn-secondary', 'btn-primary');
+    document.getElementById('paystack-pay-btn')?.classList.replace('btn-primary', 'btn-secondary');
+  }
+}
+
+function showPaymentWall() {
+  applyPaymentWallRegion();
+  document.getElementById('payment-wall')?.classList.remove('hidden');
+}
+function hidePaymentWall() { document.getElementById('payment-wall')?.classList.add('hidden'); }
 
 async function loadConfig() {
   try {
     const data = await fetch('/api/config').then(r => r.json());
-    state.paystackKey         = data.paystackPublicKey    || '';
-    state.planCode            = data.paystackPlanCode     || '';
+    state.paystackKey          = data.paystackPublicKey    || '';
+    state.planCode             = data.paystackPlanCode     || '';
     state.stripePublishableKey = data.stripePublishableKey || '';
+    state.flutterwaveKey       = data.flutterwavePublicKey || '';
   } catch {}
 }
 
@@ -357,6 +393,76 @@ async function verifyPayment(reference) {
   } catch (err) {
     const btn = document.getElementById('paystack-pay-btn');
     if (btn) { btn.disabled = false; btn.textContent = 'Subscribe — ₦3,000/month'; }
+    showToast('Verification failed: ' + err.message);
+  }
+}
+
+function openFlutterwave() {
+  if (!state.user) { showAuthOverlay(); return; }
+
+  const btn = document.getElementById('flutterwave-pay-btn');
+
+  if (!state.flutterwaveKey) {
+    // Dev / test mode — simulate a subscription payment
+    if (btn) { btn.disabled = true; btn.textContent = 'Processing…'; }
+    showToast('Test mode: simulating Flutterwave payment…');
+    setTimeout(() => verifyFlutterwavePayment('TEST_FLW_' + Date.now()), 1200);
+    return;
+  }
+
+  if (!window.FlutterwaveCheckout) {
+    showToast('Flutterwave failed to load. Please check your internet connection.');
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Opening checkout…'; }
+
+  window.FlutterwaveCheckout({
+    public_key:      state.flutterwaveKey,
+    tx_ref:          'REFLECTAI_FLW_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+    amount:          5,
+    currency:        'USD',
+    payment_options: 'card',
+    customer: {
+      email: state.user.email,
+      name:  state.user.email
+    },
+    customizations: {
+      title:       'ReflectAI Pro',
+      description: 'Monthly subscription — $5/month',
+      logo:        ''
+    },
+    callback(data) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Subscribe with Flutterwave — $5/month'; }
+      if (data.status === 'successful' || data.status === 'completed') {
+        verifyFlutterwavePayment(data.transaction_id);
+      } else {
+        showToast('Payment was not completed. Please try again.');
+      }
+    },
+    onclose() {
+      if (btn) { btn.disabled = false; btn.textContent = 'Subscribe with Flutterwave — $5/month'; }
+      showToast('Payment cancelled. Your journal is waiting when you\'re ready!');
+    }
+  });
+}
+
+async function verifyFlutterwavePayment(transaction_id) {
+  showToast('Verifying payment…');
+  try {
+    const data = await api('POST', '/api/payment/verify-flutterwave', { transaction_id });
+    if (!data) return;
+    state.user = { ...state.user, ...data.user };
+    hidePaymentWall();
+    applyUserUI(state.user);
+    await loadAppData();
+    const expiry = state.user.subscriptionExpiry
+      ? new Date(state.user.subscriptionExpiry).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      : null;
+    showToast('🎉 Subscription active!' + (expiry ? ` Next renewal: ${expiry}.` : ''));
+  } catch (err) {
+    const btn = document.getElementById('flutterwave-pay-btn');
+    if (btn) { btn.disabled = false; btn.textContent = 'Subscribe with Flutterwave — $5/month'; }
     showToast('Verification failed: ' + err.message);
   }
 }
@@ -526,7 +632,7 @@ function initApp() {
 
 async function loadAppData() {
   await loadEntries();
-  if (state.user?.plan === 'pro') await loadGoals();
+  await loadGoals();
 }
 
 
@@ -1024,7 +1130,18 @@ async function goalCheckin(id) {
   finally { btn.disabled = false; btn.textContent = '🤖 Check in'; }
 }
 
+function updateGoalsTrialNote() {
+  const note = document.getElementById('goals-trial-note');
+  if (!note) return;
+  if (!state.user || state.user.plan === 'pro') { note.classList.add('hidden'); return; }
+  note.classList.remove('hidden');
+  note.textContent = state.goals.length >= 1
+    ? '1 free goal included · Subscribe for unlimited goals & AI check-ins'
+    : 'Free trial: add 1 goal to try it out · Subscribe for unlimited';
+}
+
 function renderGoals() {
+  updateGoalsTrialNote();
   const container = document.getElementById('goals-list');
   if (!state.goals.length) {
     container.innerHTML = `<div class="goals-empty"><p>No goals yet. Add your first goal above — your journal entries will help track your progress.</p></div>`;

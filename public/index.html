@@ -96,22 +96,22 @@
         <li><span>🔒</span> Stored privately on your own server</li>
       </ul>
 
-      <div class="payment-options">
-        <div class="payment-option">
-          <p class="payment-option-label">Nigeria &amp; Africa</p>
+      <div class="payment-options" id="payment-options-container">
+        <div class="payment-option" id="payment-opt-paystack">
+          <p class="payment-option-label">Nigeria</p>
           <button class="btn btn-primary btn-paystack" id="paystack-pay-btn" onclick="openPaystack()">
             Subscribe with Paystack — ₦3,000/month
           </button>
         </div>
         <div class="payment-divider"><span>or</span></div>
-        <div class="payment-option">
+        <div class="payment-option" id="payment-opt-flutterwave">
           <p class="payment-option-label">International</p>
-          <button class="btn btn-secondary btn-stripe" id="stripe-pay-btn" onclick="openStripe()">
-            Subscribe with Stripe — $5/month
+          <button class="btn btn-secondary btn-flutterwave" id="flutterwave-pay-btn" onclick="openFlutterwave()">
+            Subscribe with Flutterwave — $5/month
           </button>
         </div>
       </div>
-      <p class="payment-security">🔒 Secured by <strong>Paystack</strong> &amp; <strong>Stripe</strong> · Cancel anytime</p>
+      <p class="payment-security">🔒 Secured by <strong>Paystack</strong> &amp; <strong>Flutterwave</strong> · Cancel anytime</p>
       <div class="payment-logout-row">
         <button class="btn btn-ghost btn-sm" onclick="handleLogout()">Log out</button>
       </div>
@@ -397,6 +397,7 @@
 
       <!-- Pro-user content -->
       <div id="weekly-content" class="hidden">
+        <p id="weekly-trial-note" class="free-entry-counter hidden">✦ Free preview — 1 weekly insight included · Subscribe for unlimited</p>
         <div class="insight-card reveal reveal-delay-1">
           <div id="insight-loader" class="loader hidden" role="status">
             <div class="spinner" aria-hidden="true"></div>
@@ -470,6 +471,7 @@
           ></textarea>
         </form>
 
+        <p id="goals-trial-note" class="free-entry-counter hidden" aria-live="polite"></p>
         <div id="goals-list" class="goals-list" aria-live="polite"></div>
 
       </div>
@@ -579,6 +581,8 @@
 
   <!-- Paystack inline JS — loads payment popup. Safe to fail silently (handled in app.js) -->
   <script src="https://js.paystack.co/v1/inline.js"></script>
+  <!-- Flutterwave inline JS — loads payment popup. Safe to fail silently (handled in app.js) -->
+  <script src="https://checkout.flutterwave.com/v3.js"></script>
   <script src="app.js"></script>
 
 </body>
