@@ -241,12 +241,12 @@ function applyUserUI(user) {
   const navBadge = document.getElementById('nav-plan-badge');
   navBadge.textContent = isPro ? 'PRO' : 'FREE';
   navBadge.classList.toggle('pro', isPro);
-  document.getElementById('account-email').textContent = user.email;
-  const accBadge = document.getElementById('account-plan-badge');
-  accBadge.textContent = isPro ? 'PRO' : 'FREE';
-  accBadge.classList.toggle('pro', isPro);
-  document.getElementById('account-plan-label').textContent = isPro ? 'Pro plan' : 'Free plan';
-  document.getElementById('account-upgrade-btn').classList.toggle('hidden', isPro);
+  document.getElementById('dropdown-email').textContent = user.email;
+  const dropBadge = document.getElementById('dropdown-plan-badge');
+  dropBadge.textContent = isPro ? 'PRO' : 'FREE';
+  dropBadge.classList.toggle('pro', isPro);
+  document.getElementById('dropdown-plan-label').textContent = isPro ? 'Pro plan' : 'Free plan';
+  document.getElementById('dropdown-upgrade-btn').classList.toggle('hidden', isPro);
   applySubscriptionUI(user);
 
   // Update hero CTA button label
@@ -473,7 +473,7 @@ async function cancelSubscription() {
     : 'the end of your billing period';
   if (!confirm(`Cancel your subscription?\n\nYou'll keep access until ${expiry}. No further charges after that.`)) return;
 
-  const btn = document.getElementById('subscription-cancel-btn');
+  const btn = document.getElementById('dropdown-cancel-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Cancelling…'; }
 
   try {
@@ -483,7 +483,7 @@ async function cancelSubscription() {
     showToast('Subscription cancelled. You have access until ' + expiry + '.');
   } catch (err) {
     showToast('Could not cancel: ' + err.message);
-    if (btn) { btn.disabled = false; btn.textContent = 'Cancel subscription'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Cancel Subscription'; }
   }
 }
 
@@ -558,36 +558,59 @@ async function handleStripeReturn() {
 }
 
 function applySubscriptionUI(user) {
-  const cancelBtn = document.getElementById('subscription-cancel-btn');
-  const resubBtn  = document.getElementById('subscription-resubscribe-btn');
-  const statusEl  = document.getElementById('subscription-status-text');
-  const row       = document.getElementById('subscription-status-row');
-  if (!row) return;
+  const cancelBtn  = document.getElementById('dropdown-cancel-btn');
+  const resubBtn   = document.getElementById('dropdown-resub-btn');
+  const renewalEl  = document.getElementById('dropdown-renewal');
 
   if (!user.subscriptionExpiry) {
-    row.classList.add('hidden');
+    if (renewalEl) renewalEl.classList.add('hidden');
+    if (cancelBtn) cancelBtn.classList.add('hidden');
+    if (resubBtn)  resubBtn.classList.add('hidden');
     return;
   }
-  row.classList.remove('hidden');
 
   const expiryDate = new Date(user.subscriptionExpiry);
   const expiryStr  = expiryDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const expired    = user.subscriptionExpiry <= Date.now() || user.subscriptionStatus === 'lapsed';
 
   if (!expired && user.subscriptionStatus === 'active') {
-    statusEl.textContent = `Active · Renews ${expiryStr}`;
-    if (cancelBtn) { cancelBtn.style.display = 'inline-flex'; cancelBtn.disabled = false; cancelBtn.textContent = 'Cancel subscription'; }
-    if (resubBtn)  resubBtn.style.display = 'none';
+    if (renewalEl) { renewalEl.textContent = `Renews ${expiryStr}`; renewalEl.classList.remove('hidden'); }
+    if (cancelBtn) { cancelBtn.classList.remove('hidden'); cancelBtn.disabled = false; cancelBtn.textContent = 'Cancel Subscription'; }
+    if (resubBtn)  resubBtn.classList.add('hidden');
   } else if (!expired && user.subscriptionStatus === 'non-renewing') {
-    statusEl.textContent = `Active until ${expiryStr} · Will not renew`;
-    if (cancelBtn) cancelBtn.style.display = 'none';
-    if (resubBtn)  resubBtn.style.display = 'inline-flex';
+    if (renewalEl) { renewalEl.textContent = `Active until ${expiryStr} · Will not renew`; renewalEl.classList.remove('hidden'); }
+    if (cancelBtn) cancelBtn.classList.add('hidden');
+    if (resubBtn)  resubBtn.classList.remove('hidden');
   } else {
-    statusEl.textContent = `Expired ${expiryStr}`;
-    if (cancelBtn) cancelBtn.style.display = 'none';
-    if (resubBtn)  resubBtn.style.display = 'inline-flex';
+    if (renewalEl) { renewalEl.textContent = `Expired ${expiryStr}`; renewalEl.classList.remove('hidden'); }
+    if (cancelBtn) cancelBtn.classList.add('hidden');
+    if (resubBtn)  resubBtn.classList.remove('hidden');
   }
 }
+
+function toggleAccountDropdown() {
+  const dropdown = document.getElementById('account-dropdown');
+  const trigger  = document.getElementById('account-dropdown-trigger');
+  const isOpen   = !dropdown.classList.contains('hidden');
+  if (isOpen) {
+    closeAccountDropdown();
+  } else {
+    dropdown.classList.remove('hidden');
+    if (trigger) trigger.setAttribute('aria-expanded', 'true');
+  }
+}
+
+function closeAccountDropdown() {
+  const dropdown = document.getElementById('account-dropdown');
+  const trigger  = document.getElementById('account-dropdown-trigger');
+  if (dropdown) dropdown.classList.add('hidden');
+  if (trigger)  trigger.setAttribute('aria-expanded', 'false');
+}
+
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('account-dropdown-wrap');
+  if (wrap && !wrap.contains(e.target)) closeAccountDropdown();
+});
 
 
 /* ================================================================

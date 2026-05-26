@@ -217,9 +217,29 @@
         <!-- Shown after login -->
         <div class="nav-user hidden" id="nav-user">
           <span class="plan-badge" id="nav-plan-badge">FREE</span>
-          <button class="btn btn-ghost nav-feedback-btn" onclick="showFeedbackModal()">💬 Feedback</button>
-          <a href="#account-section" class="nav-account-link">👤 My Account</a>
-          <button class="btn btn-ghost nav-logout" onclick="handleLogout()">Log out</button>
+          <div class="account-dropdown-wrap" id="account-dropdown-wrap">
+            <button class="nav-account-btn" id="account-dropdown-trigger" onclick="toggleAccountDropdown()" aria-haspopup="true" aria-expanded="false">
+              👤 My Account
+            </button>
+            <div class="account-dropdown hidden" id="account-dropdown" role="menu">
+              <div class="dropdown-user-info">
+                <p class="dropdown-email" id="dropdown-email"></p>
+                <div class="dropdown-plan-row">
+                  <span class="plan-badge" id="dropdown-plan-badge">FREE</span>
+                  <span class="dropdown-plan-label" id="dropdown-plan-label">Free plan</span>
+                </div>
+                <p class="dropdown-renewal hidden" id="dropdown-renewal"></p>
+              </div>
+              <div class="dropdown-divider"></div>
+              <div class="dropdown-actions">
+                <button class="dropdown-btn" id="dropdown-upgrade-btn" onclick="showUpgradeModal();closeAccountDropdown()">⬆ Upgrade to Pro</button>
+                <button class="dropdown-btn dropdown-btn-danger hidden" id="dropdown-cancel-btn" onclick="cancelSubscription()">Cancel Subscription</button>
+                <button class="dropdown-btn hidden" id="dropdown-resub-btn" onclick="openPaystack();closeAccountDropdown()">↩ Resubscribe</button>
+                <button class="dropdown-btn" onclick="showFeedbackModal();closeAccountDropdown()">💬 Share Feedback</button>
+                <button class="dropdown-btn dropdown-btn-logout" onclick="handleLogout()">Log out</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -502,49 +522,6 @@
 
 
   <!-- =============================================================
-       ACCOUNT  (minimal section — mainly useful on mobile)
-  ============================================================== -->
-  <section id="account-section" class="main-section" aria-label="Account settings">
-    <div class="container">
-      <div class="section-header reveal">
-        <span class="section-label">Account</span>
-        <h2>Your Account</h2>
-      </div>
-      <div class="account-card reveal reveal-delay-1">
-        <div class="account-info">
-          <p class="account-email" id="account-email"></p>
-          <div class="account-plan-row">
-            <span class="plan-badge" id="account-plan-badge">FREE</span>
-            <span class="account-plan-label" id="account-plan-label">Free plan</span>
-          </div>
-        </div>
-        <div id="subscription-status-row" class="subscription-status-row hidden">
-          <span id="subscription-status-text" class="subscription-status-text"></span>
-          <button id="subscription-cancel-btn" class="btn btn-sm btn-ghost-danger" onclick="cancelSubscription()" style="display:none">Cancel subscription</button>
-          <button id="subscription-resubscribe-btn" class="btn btn-sm btn-primary" onclick="openPaystack()" style="display:none">Resubscribe</button>
-        </div>
-        <div class="account-actions">
-          <button class="btn btn-secondary" id="account-upgrade-btn" onclick="showUpgradeModal()">Upgrade to Pro</button>
-          <button class="btn btn-secondary" onclick="showFeedbackModal()">Share Feedback</button>
-          <button class="btn btn-ghost" onclick="handleLogout()">Log out</button>
-        </div>
-      </div>
-    </div>
-  </section>
-
-
-  <!-- =============================================================
-       FOOTER
-  ============================================================== -->
-  <footer>
-    <div class="container">
-      <p>ReflectAI &mdash; Built with the <a href="https://www.anthropic.com" target="_blank" rel="noopener">Anthropic Claude API</a></p>
-      <p>Your entries are stored on your private account. Only submitted text is sent to the AI.</p>
-    </div>
-  </footer>
-
-
-  <!-- =============================================================
        MOBILE BOTTOM NAV
   ============================================================== -->
   <!-- =============================================================
@@ -571,11 +548,8 @@
       <a href="#goals-section" class="mobile-nav-link">
         <span class="nav-icon">🎯</span>Goals
       </a>
-      <a href="#account-section" class="mobile-nav-link">
+      <button class="mobile-nav-link mobile-nav-feedback" onclick="toggleAccountDropdown()">
         <span class="nav-icon">👤</span>Account
-      </a>
-      <button class="mobile-nav-link mobile-nav-feedback" onclick="showFeedbackModal()">
-        <span class="nav-icon">💬</span>Feedback
       </button>
     </div>
   </nav>

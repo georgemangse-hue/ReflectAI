@@ -2256,20 +2256,111 @@ footer {
 
 
 /* ================================================================
-   39. NAV ACCOUNT LINK
+   39. ACCOUNT DROPDOWN
 ================================================================ */
-.nav-account-link {
+.account-dropdown-wrap {
+  position: relative;
+}
+.nav-account-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
   font-size: 0.82rem;
   font-weight: 600;
   color: var(--text-secondary);
-  text-decoration: none;
   padding: 0.28rem 0.6rem;
   border-radius: 6px;
   transition: background 0.12s, color 0.12s;
+  font-family: inherit;
 }
-.nav-account-link:hover {
+.nav-account-btn:hover,
+.nav-account-btn[aria-expanded="true"] {
   background: var(--surface-2);
   color: var(--text);
+}
+.account-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 260px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  z-index: 200;
+  overflow: hidden;
+  animation: dropdown-in 0.15s ease;
+}
+@keyframes dropdown-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.dropdown-user-info {
+  padding: 1rem 1.1rem 0.85rem;
+}
+.dropdown-email {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 0 0 0.5rem;
+  word-break: break-all;
+}
+.dropdown-plan-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.dropdown-plan-label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+.dropdown-renewal {
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.dropdown-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0;
+}
+.dropdown-actions {
+  padding: 0.4rem 0;
+}
+.dropdown-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-family: inherit;
+  color: var(--text);
+  padding: 0.6rem 1.1rem;
+  transition: background 0.1s;
+}
+.dropdown-btn:hover {
+  background: var(--surface-2);
+}
+.dropdown-btn-danger {
+  color: #e05c5c;
+}
+.dropdown-btn-danger:hover {
+  background: rgba(224, 92, 92, 0.08);
+}
+.dropdown-btn-logout {
+  color: var(--text-muted);
+}
+/* On mobile, anchor dropdown to viewport width */
+@media (max-width: 639px) {
+  .account-dropdown {
+    position: fixed;
+    top: auto;
+    bottom: 4.5rem;
+    right: 1rem;
+    left: 1rem;
+    min-width: unset;
+  }
 }
 
 
