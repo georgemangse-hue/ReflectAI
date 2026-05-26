@@ -1473,6 +1473,38 @@ footer {
   margin-bottom: 1.75rem;
 }
 
+/* ── Clear confirm modal ─────────────────────────────────────── */
+.clear-confirm-card {
+  max-width: 400px;
+  text-align: center;
+}
+.clear-confirm-card h2 {
+  margin-bottom: 0.6rem;
+}
+.clear-confirm-card p {
+  font-size: 0.93rem;
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+  line-height: 1.6;
+}
+.clear-confirm-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+.btn-danger {
+  background: #c0392b;
+  color: #fff;
+  border: none;
+  padding: 0.55rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-danger:hover { background: #a93226; }
+
 /* ── Feedback modal ──────────────────────────────────────────── */
 .feedback-modal-card {
   max-width: 500px;

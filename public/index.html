@@ -149,6 +149,21 @@
 
 
   <!-- =============================================================
+       CLEAR HISTORY CONFIRMATION MODAL
+  ============================================================== -->
+  <div id="clear-confirm-modal" class="modal-overlay hidden" aria-modal="true" role="dialog" aria-label="Confirm clear all entries" onclick="if(event.target===this)closeClearConfirm()">
+    <div class="modal-card clear-confirm-card">
+      <h2>Are you sure?</h2>
+      <p>This will permanently delete all your journal entries and cannot be undone.</p>
+      <div class="clear-confirm-actions">
+        <button class="btn btn-ghost" onclick="closeClearConfirm()">Cancel</button>
+        <button class="btn btn-danger" id="clear-confirm-btn" onclick="executeClearHistory()">Delete All</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- =============================================================
        FEEDBACK MODAL
   ============================================================== -->
   <div id="feedback-modal" class="modal-overlay hidden" aria-modal="true" role="dialog" aria-label="Share feedback">

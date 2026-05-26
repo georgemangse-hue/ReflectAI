@@ -722,8 +722,18 @@ async function saveEntry(text, mood) {
   renderMoodSection();
 }
 
-async function confirmClearHistory() {
-  if (!window.confirm('Delete ALL your journal entries?\n\nThis cannot be undone.')) return;
+function confirmClearHistory() {
+  document.getElementById('clear-confirm-modal').classList.remove('hidden');
+}
+
+function closeClearConfirm() {
+  document.getElementById('clear-confirm-modal').classList.add('hidden');
+}
+
+async function executeClearHistory() {
+  const btn = document.getElementById('clear-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
   try {
     await api('DELETE', '/api/entries');
     state.entries = []; state.streak = 0;
@@ -735,8 +745,13 @@ async function confirmClearHistory() {
     renderStreak(0);
     renderHistory();
     renderMoodSection();
+    closeClearConfirm();
     showToast('All entries have been cleared.');
-  } catch (err) { showToast('Could not clear entries: ' + err.message); }
+  } catch (err) {
+    showToast('Could not clear entries: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = 'Delete All';
+  }
 }
 
 
