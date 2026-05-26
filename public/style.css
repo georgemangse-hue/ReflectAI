@@ -269,6 +269,15 @@ nav {
 .mobile-nav-link:hover .nav-icon {
   transform: translateY(-2px);
 }
+.mobile-nav-feedback {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font-size: inherit;
+  font-family: inherit;
+  padding: 0;
+}
 
 
 /* ================================================================

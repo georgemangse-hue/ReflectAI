@@ -217,6 +217,7 @@
         <!-- Shown after login -->
         <div class="nav-user hidden" id="nav-user">
           <span class="plan-badge" id="nav-plan-badge">FREE</span>
+          <button class="btn btn-ghost nav-feedback-btn" onclick="showFeedbackModal()">💬 Feedback</button>
           <a href="#account-section" class="nav-account-link">👤 My Account</a>
           <button class="btn btn-ghost nav-logout" onclick="handleLogout()">Log out</button>
         </div>
@@ -560,6 +561,9 @@
       <a href="#account-section" class="mobile-nav-link">
         <span class="nav-icon">👤</span>Account
       </a>
+      <button class="mobile-nav-link mobile-nav-feedback" onclick="showFeedbackModal()">
+        <span class="nav-icon">💬</span>Feedback
+      </button>
     </div>
   </nav>
 
