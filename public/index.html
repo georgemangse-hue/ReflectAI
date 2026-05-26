@@ -531,6 +531,10 @@
           Clear All
         </button>
       </div>
+      <div class="history-search-wrap reveal">
+        <input type="search" id="history-search" class="history-search-input"
+          placeholder="Search entries…" oninput="renderHistory()" autocomplete="off" />
+      </div>
       <div id="history-container" aria-live="polite"></div>
     </div>
   </section>

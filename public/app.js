@@ -1219,6 +1219,11 @@ function renderGoals() {
 function renderHistory() {
   updateFreeEntryCounter();
   const container = document.getElementById('history-container');
+  const query = (document.getElementById('history-search')?.value || '').trim().toLowerCase();
+  const entries = query
+    ? state.entries.filter(e => e.text.toLowerCase().includes(query))
+    : state.entries;
+
   if (!state.entries.length) {
     container.innerHTML = `
       <div class="history-empty">
@@ -1228,10 +1233,19 @@ function renderHistory() {
     return;
   }
 
+  if (!entries.length) {
+    container.innerHTML = `
+      <div class="history-empty">
+        <div class="history-empty-icon">🔍</div>
+        <p>No entries match "<strong>${escapeHTML(query)}</strong>".</p>
+      </div>`;
+    return;
+  }
+
   const list = document.createElement('div');
   list.className = 'history-list';
 
-  state.entries.forEach(entry => {
+  entries.forEach(entry => {
     const preview   = entry.text.length > 80 ? entry.text.slice(0, 80) + '…' : entry.text;
     const moodInfo  = moodById(entry.mood);
     const moodBadge = moodInfo
