@@ -295,26 +295,24 @@ function isNigerianUser() {
 }
 
 function applyPaymentWallRegion() {
-  const container = document.getElementById('payment-options-container');
-  if (!container) return;
   const paystackOpt    = document.getElementById('payment-opt-paystack');
   const flutterwaveOpt = document.getElementById('payment-opt-flutterwave');
-  const divider        = container.querySelector('.payment-divider');
-  if (!paystackOpt || !flutterwaveOpt || !divider) return;
+  const divider        = document.querySelector('#payment-options-container .payment-divider');
+  if (!paystackOpt || !flutterwaveOpt) return;
 
   const priceEl = document.getElementById('payment-price-display');
   const note    = '<span class="payment-price-note">/month · cancel anytime</span>';
 
   if (isNigerianUser()) {
     if (priceEl) priceEl.innerHTML = '₦3,000' + note;
-    container.append(paystackOpt, divider, flutterwaveOpt);
-    document.getElementById('paystack-pay-btn')?.classList.replace('btn-secondary', 'btn-primary');
-    document.getElementById('flutterwave-pay-btn')?.classList.replace('btn-primary', 'btn-secondary');
+    paystackOpt.classList.remove('hidden');
+    flutterwaveOpt.classList.add('hidden');
+    if (divider) divider.classList.add('hidden');
   } else {
     if (priceEl) priceEl.innerHTML = '$7.99' + note;
-    container.append(flutterwaveOpt, divider, paystackOpt);
-    document.getElementById('flutterwave-pay-btn')?.classList.replace('btn-secondary', 'btn-primary');
-    document.getElementById('paystack-pay-btn')?.classList.replace('btn-primary', 'btn-secondary');
+    flutterwaveOpt.classList.remove('hidden');
+    paystackOpt.classList.add('hidden');
+    if (divider) divider.classList.add('hidden');
   }
 }
 
