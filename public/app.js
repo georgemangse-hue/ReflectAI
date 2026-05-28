@@ -297,18 +297,21 @@ function isNigerianUser() {
 function applyPaymentWallRegion() {
   const container = document.getElementById('payment-options-container');
   if (!container) return;
-  const paystackOpt     = document.getElementById('payment-opt-paystack');
-  const flutterwaveOpt  = document.getElementById('payment-opt-flutterwave');
-  const divider         = container.querySelector('.payment-divider');
+  const paystackOpt    = document.getElementById('payment-opt-paystack');
+  const flutterwaveOpt = document.getElementById('payment-opt-flutterwave');
+  const divider        = container.querySelector('.payment-divider');
   if (!paystackOpt || !flutterwaveOpt || !divider) return;
 
+  const priceEl = document.getElementById('payment-price-display');
+  const note    = '<span class="payment-price-note">/month · cancel anytime</span>';
+
   if (isNigerianUser()) {
-    // Nigerian users: Paystack first (primary), Flutterwave second (secondary)
+    if (priceEl) priceEl.innerHTML = '₦3,000' + note;
     container.append(paystackOpt, divider, flutterwaveOpt);
     document.getElementById('paystack-pay-btn')?.classList.replace('btn-secondary', 'btn-primary');
     document.getElementById('flutterwave-pay-btn')?.classList.replace('btn-primary', 'btn-secondary');
   } else {
-    // International users: Flutterwave first (primary), Paystack second (secondary)
+    if (priceEl) priceEl.innerHTML = '$7.99' + note;
     container.append(flutterwaveOpt, divider, paystackOpt);
     document.getElementById('flutterwave-pay-btn')?.classList.replace('btn-secondary', 'btn-primary');
     document.getElementById('paystack-pay-btn')?.classList.replace('btn-primary', 'btn-secondary');
@@ -420,7 +423,7 @@ function openFlutterwave() {
   window.FlutterwaveCheckout({
     public_key:      state.flutterwaveKey,
     tx_ref:          'REFLECTAI_FLW_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
-    amount:          5,
+    amount:          7.99,
     currency:        'USD',
     payment_options: 'card',
     customer: {
@@ -429,11 +432,11 @@ function openFlutterwave() {
     },
     customizations: {
       title:       'ReflectAI Pro',
-      description: 'Monthly subscription — $5/month',
+      description: 'Monthly subscription — $7.99/month',
       logo:        ''
     },
     callback(data) {
-      if (btn) { btn.disabled = false; btn.textContent = 'Subscribe with Flutterwave — $5/month'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Subscribe with Flutterwave — $7.99/month'; }
       if (data.status === 'successful' || data.status === 'completed') {
         verifyFlutterwavePayment(data.transaction_id);
       } else {
@@ -441,7 +444,7 @@ function openFlutterwave() {
       }
     },
     onclose() {
-      if (btn) { btn.disabled = false; btn.textContent = 'Subscribe with Flutterwave — $5/month'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Subscribe with Flutterwave — $7.99/month'; }
       showToast('Payment cancelled. Your journal is waiting when you\'re ready!');
     }
   });
@@ -462,7 +465,7 @@ async function verifyFlutterwavePayment(transaction_id) {
     showToast('🎉 Subscription active!' + (expiry ? ` Next renewal: ${expiry}.` : ''));
   } catch (err) {
     const btn = document.getElementById('flutterwave-pay-btn');
-    if (btn) { btn.disabled = false; btn.textContent = 'Subscribe with Flutterwave — $5/month'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Subscribe with Flutterwave — $7.99/month'; }
     showToast('Verification failed: ' + err.message);
   }
 }

@@ -609,8 +609,8 @@ const server = http.createServer(async (req, res) => {
 
       if (flwResult.status !== 'success' || flwResult.data?.status !== 'successful')
         return sendJSON(res, 400, { error: 'Payment not successful. Please try again.' });
-      if ((flwResult.data?.amount || 0) < 5)
-        return sendJSON(res, 400, { error: 'Payment amount is insufficient (expected $5).' });
+      if ((flwResult.data?.amount || 0) < 7)
+        return sendJSON(res, 400, { error: 'Payment amount is insufficient (expected $7.99).' });
 
       updateUser(user.id, {
         paid: true, plan: 'pro',
