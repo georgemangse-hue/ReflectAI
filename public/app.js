@@ -57,7 +57,8 @@ const state = {
   paystackKey:         '',
   planCode:            '',
   stripePublishableKey: '',
-  flutterwaveKey:      ''
+  flutterwaveKey:      '',
+  countryCode:         null   // set by /api/geo on load
 };
 
 
@@ -291,6 +292,9 @@ function closePaymentWall()  { hidePaymentWall(); }
    5. PAYMENT — PAYSTACK + FLUTTERWAVE
 ================================================================ */
 function isNigerianUser() {
+  // Primary: server-side IP geo (fetched at load via /api/geo)
+  if (state.countryCode !== null) return state.countryCode === 'NG';
+  // Fallback: browser timezone (covers offline / geo-fetch failure)
   return Intl.DateTimeFormat().resolvedOptions().timeZone === 'Africa/Lagos';
 }
 
@@ -324,11 +328,15 @@ function hidePaymentWall() { document.getElementById('payment-wall')?.classList.
 
 async function loadConfig() {
   try {
-    const data = await fetch('/api/config').then(r => r.json());
-    state.paystackKey          = data.paystackPublicKey    || '';
-    state.planCode             = data.paystackPlanCode     || '';
-    state.stripePublishableKey = data.stripePublishableKey || '';
-    state.flutterwaveKey       = data.flutterwavePublicKey || '';
+    const [config, geo] = await Promise.all([
+      fetch('/api/config').then(r => r.json()),
+      fetch('/api/geo').then(r => r.json()).catch(() => ({}))
+    ]);
+    state.paystackKey          = config.paystackPublicKey    || '';
+    state.planCode             = config.paystackPlanCode     || '';
+    state.stripePublishableKey = config.stripePublishableKey || '';
+    state.flutterwaveKey       = config.flutterwavePublicKey || '';
+    state.countryCode          = geo.country || null;
   } catch {}
 }
 
