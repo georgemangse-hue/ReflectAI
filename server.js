@@ -1195,32 +1195,6 @@ Your check-in should note any specific evidence from the journal entries that re
     }
 
     /* ==============================================================
-       GEO — IP-based country detection (used for pricing display)
-    ============================================================== */
-    if (method === 'GET' && url === '/api/geo') {
-      const raw     = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
-      const ip      = raw.split(',')[0].trim().replace(/^::ffff:/, '');
-      const isLocal = !ip || ip === '127.0.0.1' || ip === '::1';
-
-      if (isLocal) return sendJSON(res, 200, { country: null });
-
-      try {
-        const country = await new Promise((resolve, reject) => {
-          const r = https.get(`https://ipapi.co/${encodeURIComponent(ip)}/country/`, res2 => {
-            let body = '';
-            res2.on('data', c => body += c);
-            res2.on('end', () => resolve(body.trim()));
-          });
-          r.on('error', reject);
-          r.setTimeout(3000, () => { r.destroy(); reject(new Error('timeout')); });
-        });
-        return sendJSON(res, 200, { country: country.length === 2 ? country : null });
-      } catch {
-        return sendJSON(res, 200, { country: null });
-      }
-    }
-
-    /* ==============================================================
        STATIC FILES
     ============================================================== */
     const urlPath  = (url === '/' ? '/index.html' : url === '/admin' ? '/admin.html' : url === '/demo' ? '/demo.html' : url);

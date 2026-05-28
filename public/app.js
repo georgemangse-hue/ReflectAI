@@ -330,13 +330,13 @@ async function loadConfig() {
   try {
     const [config, geo] = await Promise.all([
       fetch('/api/config').then(r => r.json()),
-      fetch('/api/geo').then(r => r.json()).catch(() => ({}))
+      fetch('https://ipwho.is/').then(r => r.json()).catch(() => ({}))
     ]);
     state.paystackKey          = config.paystackPublicKey    || '';
     state.planCode             = config.paystackPlanCode     || '';
     state.stripePublishableKey = config.stripePublishableKey || '';
     state.flutterwaveKey       = config.flutterwavePublicKey || '';
-    state.countryCode          = geo.country || null;
+    state.countryCode          = geo.country_code || null;
   } catch {}
 }
 
