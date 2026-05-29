@@ -1082,6 +1082,12 @@ Available categories (pick the 3 that best fit): Feelings, Mindset, Growth, Next
       if (!Array.isArray(messages) || messages.length < 3)
         return sendJSON(res, 400, { error: 'Missing or too-short conversation history.' });
 
+      // Enforce per-plan exchange limits (history starts at 2; each exchange adds 2 entries + 1 pending user msg)
+      const exchangeRequested = (messages.length - 1) / 2;
+      const coachLimit = (isSubscriptionActive(user) && user.plan === 'pro') ? 10 : 6;
+      if (exchangeRequested > coachLimit)
+        return sendJSON(res, 403, { error: `You've reached the ${coachLimit}-exchange limit for this session.`, code: 'COACH_LIMIT_REACHED' });
+
       // Cap history to keep context manageable: always keep first 2 (entry + opening prompt), then last 10
       const trimmed = messages.length > 12
         ? [...messages.slice(0, 2), ...messages.slice(-10)]

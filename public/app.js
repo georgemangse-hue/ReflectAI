@@ -60,6 +60,7 @@ const state = {
   flutterwaveKey:      '',
   countryCode:         null,  // set by detectCountry() on load
   countryOverride:     null,  // set when user clicks "Switch currency"
+  userPlan:            'free', // 'free' or 'pro'
   coachEntry:          '',    // journal text for the current coach session
   coachSessions:       {}     // keyed by prompt index: { history: [{role,content}] }
 };
@@ -241,6 +242,7 @@ async function handleLogout() {
 
 function applyUserUI(user) {
   const isPro = user.plan === 'pro';
+  state.userPlan = user.plan || 'free';
   document.getElementById('nav-user').classList.remove('hidden');
   const navBadge = document.getElementById('nav-plan-badge');
   navBadge.textContent = isPro ? 'PRO' : 'FREE';
@@ -1190,6 +1192,7 @@ async function sendCoachMessage(index) {
   const thinking = appendCoachThinking(msgEl);
   thinking.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
+  let limitReached = false;
   try {
     const data = await api('POST', '/api/coach', { messages: session.history });
     thinking.remove();
@@ -1198,13 +1201,28 @@ async function sendCoachMessage(index) {
     session.history.push({ role: 'assistant', content: data.message });
     const bubble = appendCoachBubble(msgEl, 'coach', data.message);
     bubble.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    const exchangesDone = (session.history.length - 2) / 2;
+    const limit = state.userPlan === 'pro' ? 10 : 6;
+    if (exchangesDone >= limit) {
+      limitReached = true;
+      const notice = document.createElement('p');
+      notice.className = 'coach-limit-msg';
+      notice.textContent = state.userPlan === 'pro'
+        ? `You've reached the ${limit}-exchange limit for this session.`
+        : `You've reached the free limit (${limit} exchanges). Upgrade to Pro for up to 10 exchanges per session.`;
+      msgEl.appendChild(notice);
+      notice.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
   } catch (err) {
     thinking.remove();
     appendCoachBubble(msgEl, 'coach', "I'm having trouble responding right now — please try again.");
   } finally {
-    inputEl.disabled = false;
-    if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send →'; }
-    inputEl.focus();
+    if (!limitReached) {
+      inputEl.disabled = false;
+      if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send →'; }
+      inputEl.focus();
+    }
   }
 }
 
