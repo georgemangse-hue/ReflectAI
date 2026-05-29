@@ -659,6 +659,70 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* ==============================================================
+       PAYMENT — Paystack webhook (primary endpoint)
+    ============================================================== */
+    if (method === 'POST' && url === '/webhook/paystack') {
+      const rawBody = await readRawBody(req);
+      const sig     = req.headers['x-paystack-signature'];
+
+      if (PAYSTACK_SECRET_KEY && !verifyPaystackSignature(rawBody, sig || '')) {
+        res.writeHead(400); return res.end('Invalid signature');
+      }
+
+      let event;
+      try { event = JSON.parse(rawBody); } catch { res.writeHead(400); return res.end('Bad JSON'); }
+
+      const data  = event.data || {};
+      const email = data.customer?.email;
+      const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+
+      if (event.event === 'charge.success') {
+        if (email) {
+          const u = findUserByEmail(email);
+          if (u) {
+            updateUser(u.id, {
+              paid: true, plan: 'pro',
+              subscriptionStatus: 'active',
+              subscriptionExpiry: Date.now() + THIRTY_DAYS,
+              subscriptionCode:   data.subscription_code || u.subscriptionCode || null
+            });
+          }
+        }
+      }
+
+      if (event.event === 'subscription.create') {
+        if (email) {
+          const u = findUserByEmail(email);
+          if (u) {
+            const expiry = data.next_payment_date
+              ? new Date(data.next_payment_date).getTime()
+              : Date.now() + THIRTY_DAYS;
+            updateUser(u.id, {
+              paid: true, plan: 'pro',
+              subscriptionStatus: 'active',
+              subscriptionExpiry: expiry,
+              subscriptionCode:   data.subscription_code || u.subscriptionCode || null
+            });
+          }
+        }
+      }
+
+      if (event.event === 'subscription.disable') {
+        if (email) {
+          const u = findUserByEmail(email);
+          if (u) {
+            updateUser(u.id, {
+              paid: false, plan: 'free',
+              subscriptionStatus: 'disabled'
+            });
+          }
+        }
+      }
+
+      res.writeHead(200); return res.end('OK');
+    }
+
+    /* ==============================================================
        PAYMENT — Paystack webhook (handles auto-renewals)
        Paystack calls this endpoint when a subscription renews or fails.
     ============================================================== */
@@ -1270,7 +1334,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('');
   console.log('  ✦  ReflectAI is running!');
   console.log(`  →  Open http://localhost:${PORT} in your browser`);
-  console.log('  →  Paystack webhook URL: http://your-domain.com/api/webhook/paystack');
+  console.log('  →  Paystack webhook URL: http://your-domain.com/webhook/paystack');
   console.log('  →  Stripe webhook URL:   http://your-domain.com/api/webhook/stripe');
   console.log('');
   if (!API_KEY)                  console.warn('  ⚠  ANTHROPIC_API_KEY not set — AI features disabled.\n');
