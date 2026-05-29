@@ -1066,6 +1066,36 @@ Available categories (pick the 3 that best fit): Feelings, Mindset, Growth, Next
       return sendJSON(res, 200, { prompts: JSON.parse(raw) });
     }
 
+    if (method === 'POST' && url === '/api/coach') {
+      const user = requireAuth(req, res);
+      if (!user) return;
+      if (!API_KEY) return sendJSON(res, 500, { error: 'ANTHROPIC_API_KEY is not configured.' });
+
+      const { messages } = await readBody(req);
+      if (!Array.isArray(messages) || messages.length < 3)
+        return sendJSON(res, 400, { error: 'Missing or too-short conversation history.' });
+
+      // Cap history to keep context manageable: always keep first 2 (entry + opening prompt), then last 10
+      const trimmed = messages.length > 12
+        ? [...messages.slice(0, 2), ...messages.slice(-10)]
+        : messages;
+
+      const systemPrompt = `You are a warm, direct life coach having a private session with someone about their journal entry. You've already asked them a reflection prompt and they've responded. Your job is to help them go deeper — not broader.
+
+Rules:
+1. Keep responses SHORT: 1–3 sentences of reflection, then ONE focused question. Never ask two questions.
+2. Reference SPECIFICALLY what the person just said — mirror their exact words or phrases back. Show you truly heard them.
+3. Go one layer deeper with every turn. Surface answer? Push gently underneath. Already deep? Follow it to the root.
+4. Sound like a perceptive friend, not a therapist. Warm, direct, human. No clinical language.
+5. NEVER open with filler: no "That's great", "I hear you", "Thank you for sharing", "It sounds like". Just respond.
+6. Each exchange should leave the person feeling more understood AND more clear about something they hadn't fully articulated yet.
+7. Use the journal entry (provided in the first message) for context — reference specific details from it when relevant.`;
+
+      const result  = await callClaude(trimmed, systemPrompt);
+      const message = result.content[0].text;
+      return sendJSON(res, 200, { message });
+    }
+
     if (method === 'POST' && url === '/api/weekly-insight') {
       const user = requireAuth(req, res);
       if (!user) return;

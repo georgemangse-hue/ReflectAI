@@ -59,7 +59,9 @@ const state = {
   stripePublishableKey: '',
   flutterwaveKey:      '',
   countryCode:         null,  // set by detectCountry() on load
-  countryOverride:     null   // set when user clicks "Switch currency"
+  countryOverride:     null,  // set when user clicks "Switch currency"
+  coachEntry:          '',    // journal text for the current coach session
+  coachSessions:       {}     // keyed by prompt index: { history: [{role,content}] }
 };
 
 
@@ -1096,7 +1098,7 @@ document.getElementById('journal-form').addEventListener('submit', async functio
 
 
 /* ================================================================
-   14. REFLECTION PROMPTS
+   14. REFLECTION PROMPTS + COACH CONVERSATION
 ================================================================ */
 async function fetchReflectionPrompts(entryText) {
   const loader = document.getElementById('prompts-loader');
@@ -1108,17 +1110,14 @@ async function fetchReflectionPrompts(entryText) {
   error.classList.add('hidden');
   result.classList.add('hidden');
   grid.innerHTML = '';
+  state.coachEntry    = entryText;
+  state.coachSessions = {};
 
   try {
     const data = await api('POST', '/api/reflect', { entry: entryText });
     if (!data) return;
-    data.prompts.forEach(({ prompt, category }) => {
-      const card = document.createElement('div');
-      card.className = 'prompt-card';
-      card.innerHTML = `
-        <div class="prompt-category">${escapeHTML(category)}</div>
-        <p class="prompt-text">${escapeHTML(prompt)}</p>`;
-      grid.appendChild(card);
+    data.prompts.forEach(({ prompt, category }, i) => {
+      grid.appendChild(buildPromptCard(prompt, category, i));
     });
     result.classList.remove('hidden');
     showToast('✦ Entry saved and prompts generated!');
@@ -1126,6 +1125,103 @@ async function fetchReflectionPrompts(entryText) {
     error.textContent = `Couldn't get reflection prompts: ${err.message}`;
     error.classList.remove('hidden');
   } finally { loader.classList.add('hidden'); }
+}
+
+function buildPromptCard(prompt, category, index) {
+  const card = document.createElement('div');
+  card.className = 'prompt-card';
+  card.id        = `prompt-card-${index}`;
+  card.innerHTML = `
+    <div class="prompt-category">${escapeHTML(category)}</div>
+    <p class="prompt-text">${escapeHTML(prompt)}</p>
+    <button class="coach-expand-btn" onclick="openCoachThread(${index})">Explore this →</button>
+    <div class="coach-thread hidden" id="coach-thread-${index}">
+      <div class="coach-messages" id="coach-messages-${index}"></div>
+      <div class="coach-input-row">
+        <textarea class="coach-input" id="coach-input-${index}"
+          placeholder="Write your response…" rows="2"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCoachMessage(${index});}"></textarea>
+        <button class="coach-send-btn" id="coach-send-${index}" onclick="sendCoachMessage(${index})">Send →</button>
+      </div>
+    </div>`;
+  return card;
+}
+
+function openCoachThread(index) {
+  const card   = document.getElementById(`prompt-card-${index}`);
+  const thread = document.getElementById(`coach-thread-${index}`);
+  const btn    = card?.querySelector('.coach-expand-btn');
+  if (!thread || !card) return;
+
+  if (!state.coachSessions[index]) {
+    const promptText = card.querySelector('.prompt-text').textContent;
+    state.coachSessions[index] = {
+      history: [
+        { role: 'user',      content: `Here is my journal entry:\n\n${state.coachEntry}` },
+        { role: 'assistant', content: promptText }
+      ]
+    };
+    appendCoachBubble(document.getElementById(`coach-messages-${index}`), 'coach', promptText);
+  }
+
+  thread.classList.remove('hidden');
+  card.classList.add('coach-active');
+  if (btn) btn.classList.add('hidden');
+  document.getElementById(`coach-input-${index}`)?.focus();
+}
+
+async function sendCoachMessage(index) {
+  const inputEl  = document.getElementById(`coach-input-${index}`);
+  const sendBtn  = document.getElementById(`coach-send-${index}`);
+  const msgEl    = document.getElementById(`coach-messages-${index}`);
+  const session  = state.coachSessions[index];
+  if (!inputEl || !session) return;
+
+  const text = inputEl.value.trim();
+  if (!text) return;
+
+  inputEl.value    = '';
+  inputEl.disabled = true;
+  if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '…'; }
+
+  appendCoachBubble(msgEl, 'user', text);
+  session.history.push({ role: 'user', content: text });
+
+  const thinking = appendCoachThinking(msgEl);
+  thinking.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  try {
+    const data = await api('POST', '/api/coach', { messages: session.history });
+    thinking.remove();
+    if (!data) return;
+
+    session.history.push({ role: 'assistant', content: data.message });
+    const bubble = appendCoachBubble(msgEl, 'coach', data.message);
+    bubble.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch (err) {
+    thinking.remove();
+    appendCoachBubble(msgEl, 'coach', "I'm having trouble responding right now — please try again.");
+  } finally {
+    inputEl.disabled = false;
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send →'; }
+    inputEl.focus();
+  }
+}
+
+function appendCoachBubble(container, role, text) {
+  const el = document.createElement('div');
+  el.className   = `coach-bubble coach-bubble--${role}`;
+  el.textContent = text;
+  container.appendChild(el);
+  return el;
+}
+
+function appendCoachThinking(container) {
+  const el = document.createElement('div');
+  el.className = 'coach-bubble coach-bubble--coach coach-thinking';
+  el.innerHTML  = '<span></span><span></span><span></span>';
+  container.appendChild(el);
+  return el;
 }
 
 
