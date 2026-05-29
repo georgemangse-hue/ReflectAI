@@ -292,10 +292,14 @@ function closePaymentWall()  { hidePaymentWall(); }
    5. PAYMENT — PAYSTACK + FLUTTERWAVE
 ================================================================ */
 function isNigerianUser() {
-  // Primary: server-side IP geo (fetched at load via /api/geo)
+  // Primary: IP geo (fetched at load via detectCountry)
   if (state.countryCode !== null) return state.countryCode === 'NG';
-  // Fallback: browser timezone (covers offline / geo-fetch failure)
-  return Intl.DateTimeFormat().resolvedOptions().timeZone === 'Africa/Lagos';
+  // Fallback: browser timezone
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (tz === 'Africa/Lagos') return true;
+  // Last resort: UTC+1 offset with no DST (WAT) — matches Nigeria even if timezone name differs
+  const offset = -new Date().getTimezoneOffset(); // minutes east of UTC
+  return offset === 60;
 }
 
 function applyPaymentWallRegion() {
@@ -326,17 +330,29 @@ function showPaymentWall() {
 }
 function hidePaymentWall() { document.getElementById('payment-wall')?.classList.add('hidden'); }
 
+async function detectCountry() {
+  try {
+    const geo = await fetch('https://ipwho.is/').then(r => r.json());
+    if (geo.success !== false && geo.country_code) return geo.country_code;
+  } catch {}
+  try {
+    const geo = await fetch('https://ipapi.co/json/').then(r => r.json());
+    if (!geo.error && geo.country_code) return geo.country_code;
+  } catch {}
+  return null;
+}
+
 async function loadConfig() {
   try {
-    const [config, geo] = await Promise.all([
+    const [config, countryCode] = await Promise.all([
       fetch('/api/config').then(r => r.json()),
-      fetch('https://ipwho.is/').then(r => r.json()).catch(() => ({}))
+      detectCountry()
     ]);
     state.paystackKey          = config.paystackPublicKey    || '';
     state.planCode             = config.paystackPlanCode     || '';
     state.stripePublishableKey = config.stripePublishableKey || '';
     state.flutterwaveKey       = config.flutterwavePublicKey || '';
-    state.countryCode          = geo.country_code || null;
+    state.countryCode          = countryCode;
   } catch {}
 }
 
