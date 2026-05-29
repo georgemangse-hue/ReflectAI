@@ -14,3 +14,7 @@ data/
 Thumbs.db
 .vscode/
 *.log
+
+# Test screenshots and local assets
+*.png
+*.pdf
