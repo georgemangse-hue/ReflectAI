@@ -1,4 +1,4 @@
-const CACHE = 'reflectai-v1';
+const CACHE = 'reflectai-v2';
 
 const PRECACHE = [
   '/',
