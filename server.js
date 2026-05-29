@@ -550,6 +550,10 @@ const server = http.createServer(async (req, res) => {
       // Verify with Paystack
       console.log('[verify] reference received:', reference);
       console.log('[verify] key prefix in use:', PAYSTACK_SECRET_KEY.slice(0, 12) + '…');
+      if (reference.startsWith('TEST_REF_')) {
+        console.error('[verify] TEST reference submitted to live-key server — PAYSTACK_PUBLIC_KEY is missing from Railway env vars');
+        return sendJSON(res, 400, { error: 'Payment configuration error: PAYSTACK_PUBLIC_KEY is not set on the server. Contact support.' });
+      }
       const result = await verifyPaystackTransaction(reference);
       console.log('[verify] full Paystack result:', JSON.stringify(result, null, 2));
       if (!result.status || result.data?.status !== 'success') {
@@ -1351,7 +1355,21 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('');
   if (!API_KEY)                  console.warn('  ⚠  ANTHROPIC_API_KEY not set — AI features disabled.\n');
   if (!PAYSTACK_SECRET_KEY)      console.warn('  ℹ  PAYSTACK_SECRET_KEY not set — Paystack runs in test mode.\n');
+  if (!PAYSTACK_PUBLIC_KEY)      console.warn('  ⚠  PAYSTACK_PUBLIC_KEY not set — frontend will use test mode even if secret key is live!\n');
   if (!PAYSTACK_PLAN_CODE)       console.warn('  ℹ  PAYSTACK_PLAN_CODE not set — create a monthly plan in Paystack dashboard.\n');
+
+  // Detect live/test key mismatch — the most common cause of "Transaction reference not found"
+  const skEnv = PAYSTACK_SECRET_KEY.startsWith('sk_live_') ? 'live'
+              : PAYSTACK_SECRET_KEY.startsWith('sk_test_') ? 'test' : null;
+  const pkEnv = PAYSTACK_PUBLIC_KEY.startsWith('pk_live_') ? 'live'
+              : PAYSTACK_PUBLIC_KEY.startsWith('pk_test_') ? 'test' : null;
+  if (skEnv && pkEnv && skEnv !== pkEnv) {
+    console.error(`  ✖  PAYSTACK KEY MISMATCH: secret key is ${skEnv} but public key is ${pkEnv}!`);
+    console.error('     Transactions will fail with "Transaction reference not found".');
+    console.error('     Fix: make sure both PAYSTACK_SECRET_KEY and PAYSTACK_PUBLIC_KEY are from the same environment.\n');
+  } else if (skEnv) {
+    console.log(`  ✓  Paystack keys: both ${skEnv} mode.\n`);
+  }
   if (!STRIPE_SECRET_KEY)        console.warn('  ℹ  STRIPE_SECRET_KEY not set — Stripe runs in test mode.\n');
   if (!STRIPE_PRICE_ID)          console.warn('  ℹ  STRIPE_PRICE_ID not set — create a recurring price in Stripe dashboard.\n');
   if (!process.env.ADMIN_SECRET) console.warn(`  ℹ  ADMIN_SECRET not set — using auto-generated key: ${ADMIN_SECRET}\n`);
