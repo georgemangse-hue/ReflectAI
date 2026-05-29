@@ -344,11 +344,16 @@ function paystackRequest(method, path, body) {
       let raw = '';
       res.on('data', c => raw += c);
       res.on('end', () => {
+        console.log(`[Paystack] ${method} ${path} → HTTP ${res.statusCode}`);
+        console.log('[Paystack] raw response:', raw);
         try { resolve(JSON.parse(raw)); }
         catch { reject(new Error('Could not parse Paystack response')); }
       });
     });
-    req.on('error', reject);
+    req.on('error', err => {
+      console.error('[Paystack] network error:', err.message);
+      reject(err);
+    });
     if (payload) req.write(payload);
     req.end();
   });
@@ -543,11 +548,18 @@ const server = http.createServer(async (req, res) => {
       }
 
       // Verify with Paystack
+      console.log('[verify] reference received:', reference);
+      console.log('[verify] key prefix in use:', PAYSTACK_SECRET_KEY.slice(0, 12) + '…');
       const result = await verifyPaystackTransaction(reference);
-      if (!result.status || result.data?.status !== 'success')
-        return sendJSON(res, 400, { error: 'Payment not successful. Please try again.' });
-      if ((result.data?.amount || 0) < 300000)
+      console.log('[verify] full Paystack result:', JSON.stringify(result, null, 2));
+      if (!result.status || result.data?.status !== 'success') {
+        console.error('[verify] FAILED — result.status:', result.status, '| data.status:', result.data?.status, '| message:', result.message);
+        return sendJSON(res, 400, { error: result.message || 'Payment not successful. Please try again.' });
+      }
+      if ((result.data?.amount || 0) < 300000) {
+        console.error('[verify] AMOUNT MISMATCH — got:', result.data?.amount, 'kobo, need >= 300000');
         return sendJSON(res, 400, { error: 'Payment amount is insufficient (expected ₦3,000).' });
+      }
 
       // Extract subscription code — Paystack includes it in the transaction data for plan payments
       const subscriptionCode = result.data?.subscription_code || result.data?.plan_object?.subscription_code || null;
