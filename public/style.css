@@ -2068,6 +2068,19 @@ footer {
   color: var(--text-muted);
 }
 
+.payment-switch-row {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: -0.75rem 0 1rem;
+  min-height: 1.2em;
+}
+
+.payment-switch-link {
+  color: var(--primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .payment-features {
   list-style: none;
   padding: 0;

@@ -58,7 +58,8 @@ const state = {
   planCode:            '',
   stripePublishableKey: '',
   flutterwaveKey:      '',
-  countryCode:         null   // set by /api/geo on load
+  countryCode:         null,  // set by detectCountry() on load
+  countryOverride:     null   // set when user clicks "Switch currency"
 };
 
 
@@ -291,37 +292,85 @@ function closePaymentWall()  { hidePaymentWall(); }
 /* ================================================================
    5. PAYMENT — PAYSTACK + FLUTTERWAVE
 ================================================================ */
-function isNigerianUser() {
-  // Primary: IP geo (fetched at load via detectCountry)
-  if (state.countryCode !== null) return state.countryCode === 'NG';
-  // Fallback: browser timezone
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  if (tz === 'Africa/Lagos') return true;
-  // Last resort: UTC+1 offset with no DST (WAT) — matches Nigeria even if timezone name differs
-  const offset = -new Date().getTimezoneOffset(); // minutes east of UTC
-  return offset === 60;
+const GEO_CACHE_KEY = 'reflectai_geo';
+const GEO_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+async function detectCountry() {
+  // Return cached result if fresh
+  try {
+    const cached = JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || 'null');
+    if (cached && (Date.now() - cached.ts) < GEO_CACHE_TTL) return cached.code;
+  } catch {}
+
+  let code = null;
+
+  // Primary: ipapi.co
+  try {
+    const geo = await fetch('https://ipapi.co/json/').then(r => r.json());
+    if (!geo.error && geo.country_code) code = geo.country_code;
+  } catch {}
+
+  // Fallback: ipwho.is
+  if (!code) {
+    try {
+      const geo = await fetch('https://ipwho.is/').then(r => r.json());
+      if (geo.success !== false && geo.country_code) code = geo.country_code;
+    } catch {}
+  }
+
+  // Fallback: browser timezone / UTC offset
+  if (!code) {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tz === 'Africa/Lagos' || (-new Date().getTimezoneOffset()) === 60) code = 'NG';
+  }
+
+  try { localStorage.setItem(GEO_CACHE_KEY, JSON.stringify({ code, ts: Date.now() })); } catch {}
+  return code;
+}
+
+function getEffectiveRegion() {
+  if (state.countryOverride) return state.countryOverride;         // manual override
+  if (state.countryCode === 'NG') return 'NG';
+  if (state.countryCode !== null)  return 'INTL';
+  return null; // both APIs failed — let user choose
 }
 
 function applyPaymentWallRegion() {
   const paystackOpt    = document.getElementById('payment-opt-paystack');
   const flutterwaveOpt = document.getElementById('payment-opt-flutterwave');
   const divider        = document.querySelector('#payment-options-container .payment-divider');
+  const priceEl        = document.getElementById('payment-price-display');
+  const switchRow      = document.getElementById('payment-switch-currency');
   if (!paystackOpt || !flutterwaveOpt) return;
 
-  const priceEl = document.getElementById('payment-price-display');
-  const note    = '<span class="payment-price-note">/month · cancel anytime</span>';
+  const note = '<span class="payment-price-note">/month · cancel anytime</span>';
+  const region = getEffectiveRegion();
 
-  if (isNigerianUser()) {
-    if (priceEl) priceEl.innerHTML = '₦3,000' + note;
+  if (region === 'NG') {
+    if (priceEl)   priceEl.innerHTML   = '🇳🇬 ₦3,000' + note;
+    if (switchRow) switchRow.innerHTML = 'Not in Nigeria? <a href="#" class="payment-switch-link" onclick="switchPaymentCurrency(\'INTL\');return false;">Switch to USD ($7.99/month)</a>';
     paystackOpt.classList.remove('hidden');
     flutterwaveOpt.classList.add('hidden');
     if (divider) divider.classList.add('hidden');
-  } else {
-    if (priceEl) priceEl.innerHTML = '$7.99' + note;
+  } else if (region === 'INTL') {
+    if (priceEl)   priceEl.innerHTML   = '🌍 $7.99' + note;
+    if (switchRow) switchRow.innerHTML = 'In Nigeria? <a href="#" class="payment-switch-link" onclick="switchPaymentCurrency(\'NG\');return false;">Switch to NGN (₦3,000/month)</a>';
     flutterwaveOpt.classList.remove('hidden');
     paystackOpt.classList.add('hidden');
     if (divider) divider.classList.add('hidden');
+  } else {
+    // API failed — show both and let user pick
+    if (priceEl)   priceEl.innerHTML   = 'Choose your currency' + note;
+    if (switchRow) switchRow.innerHTML = '';
+    paystackOpt.classList.remove('hidden');
+    flutterwaveOpt.classList.remove('hidden');
+    if (divider) divider.classList.remove('hidden');
   }
+}
+
+function switchPaymentCurrency(region) {
+  state.countryOverride = region;
+  applyPaymentWallRegion();
 }
 
 function showPaymentWall() {
@@ -329,18 +378,6 @@ function showPaymentWall() {
   document.getElementById('payment-wall')?.classList.remove('hidden');
 }
 function hidePaymentWall() { document.getElementById('payment-wall')?.classList.add('hidden'); }
-
-async function detectCountry() {
-  try {
-    const geo = await fetch('https://ipwho.is/').then(r => r.json());
-    if (geo.success !== false && geo.country_code) return geo.country_code;
-  } catch {}
-  try {
-    const geo = await fetch('https://ipapi.co/json/').then(r => r.json());
-    if (!geo.error && geo.country_code) return geo.country_code;
-  } catch {}
-  return null;
-}
 
 async function loadConfig() {
   try {
