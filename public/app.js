@@ -1138,8 +1138,14 @@ function buildPromptCard(prompt, category, index) {
     <p class="prompt-text">${escapeHTML(prompt)}</p>
     <button class="coach-expand-btn" onclick="openCoachThread(${index})">Explore this →</button>
     <div class="coach-thread hidden" id="coach-thread-${index}">
+      <div class="coach-progress" id="coach-progress-${index}">
+        <span class="coach-progress-label" id="coach-progress-label-${index}">Exchange 1 of 6</span>
+        <div class="coach-progress-track">
+          <div class="coach-progress-fill" id="coach-progress-fill-${index}" style="width:0%"></div>
+        </div>
+      </div>
       <div class="coach-messages" id="coach-messages-${index}"></div>
-      <div class="coach-input-row">
+      <div class="coach-input-row" id="coach-input-row-${index}">
         <textarea class="coach-input" id="coach-input-${index}"
           placeholder="Write your response…" rows="2"
           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendCoachMessage(${index});}"></textarea>
@@ -1164,6 +1170,9 @@ function openCoachThread(index) {
       ]
     };
     appendCoachBubble(document.getElementById(`coach-messages-${index}`), 'coach', promptText);
+    // Initialise progress at exchange 1 (the reflection prompt just shown)
+    const total = state.userPlan === 'pro' ? 10 : 6;
+    updateCoachProgress(index, 1, total);
   }
 
   thread.classList.remove('hidden');
@@ -1192,7 +1201,12 @@ async function sendCoachMessage(index) {
   const thinking = appendCoachThinking(msgEl);
   thinking.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-  let limitReached = false;
+  // Exchange limits: free = 5 coach exchanges (6 total incl. initial reflect), pro = 9 (10 total)
+  const isPro         = state.userPlan === 'pro';
+  const coachLimit    = isPro ? 9 : 5;
+  const totalExchanges = isPro ? 10 : 6;
+
+  let sessionEnded = false;
   try {
     const data = await api('POST', '/api/coach', { messages: session.history });
     thinking.remove();
@@ -1202,23 +1216,24 @@ async function sendCoachMessage(index) {
     const bubble = appendCoachBubble(msgEl, 'coach', data.message);
     bubble.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-    const exchangesDone = (session.history.length - 2) / 2;
-    const limit = state.userPlan === 'pro' ? 10 : 6;
-    if (exchangesDone >= limit) {
-      limitReached = true;
-      const notice = document.createElement('p');
-      notice.className = 'coach-limit-msg';
-      notice.textContent = state.userPlan === 'pro'
-        ? `You've reached the ${limit}-exchange limit for this session.`
-        : `You've reached the free limit (${limit} exchanges). Upgrade to Pro for up to 10 exchanges per session.`;
-      msgEl.appendChild(notice);
-      notice.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const exchangesDone  = (session.history.length - 2) / 2; // coach exchanges completed
+    const overallExchange = exchangesDone + 1;                // +1 for initial reflect
+
+    updateCoachProgress(index, overallExchange, totalExchanges);
+
+    if (exchangesDone >= coachLimit) {
+      sessionEnded = true;
+      // Hide the input row — session is complete
+      const inputRow = document.getElementById(`coach-input-row-${index}`);
+      if (inputRow) inputRow.classList.add('hidden');
+      // Show Session Complete overlay after a brief pause so user reads final message
+      setTimeout(() => showSessionComplete(data.message), 1400);
     }
   } catch (err) {
     thinking.remove();
     appendCoachBubble(msgEl, 'coach', "I'm having trouble responding right now — please try again.");
   } finally {
-    if (!limitReached) {
+    if (!sessionEnded) {
       inputEl.disabled = false;
       if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = 'Send →'; }
       inputEl.focus();
@@ -1240,6 +1255,87 @@ function appendCoachThinking(container) {
   el.innerHTML  = '<span></span><span></span><span></span>';
   container.appendChild(el);
   return el;
+}
+
+function updateCoachProgress(index, current, total) {
+  const label = document.getElementById(`coach-progress-label-${index}`);
+  const fill  = document.getElementById(`coach-progress-fill-${index}`);
+  if (label) label.textContent = `Exchange ${current} of ${total}`;
+  if (fill)  fill.style.width  = `${Math.round((current / total) * 100)}%`;
+}
+
+function showSessionComplete(finalMessage) {
+  const isPro     = state.userPlan === 'pro';
+  const today     = getTodayISO();
+  const entry     = state.entries.find(e => e.date === today);
+  const moodInfo  = moodById(entry?.mood || state.selectedMood);
+  const dateLabel = formatDateLong(today);
+  const streak    = state.streak;
+
+  document.getElementById('session-complete-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id        = 'session-complete-overlay';
+  overlay.className = 'session-complete-overlay';
+
+  const metaItems = [
+    `<span class="session-meta-item">${escapeHTML(dateLabel)}</span>`,
+    moodInfo ? `<span class="session-meta-item">${moodInfo.emoji} ${escapeHTML(moodInfo.label)}</span>` : '',
+    streak > 0 ? `<span class="session-meta-item">🔥 ${streak}-day streak</span>` : ''
+  ].filter(Boolean).join('');
+
+  overlay.innerHTML = `
+    <div class="session-complete-card">
+      <div class="session-complete-icon">✦</div>
+      <h2 class="session-complete-title">Session Complete</h2>
+      <div class="session-complete-meta">${metaItems}</div>
+      <div class="session-insight-box">
+        <p class="session-insight-label">Today's Key Reflection</p>
+        <p class="session-insight-text" id="session-insight-text"></p>
+      </div>
+      <div class="session-complete-actions">
+        <button class="btn btn-primary" id="session-save-btn">Save to Journal</button>
+        <button class="btn btn-secondary" onclick="startNewEntry()">Start New Entry</button>
+      </div>
+      ${!isPro ? `<div class="session-upgrade-prompt">
+        Want to go deeper? <button class="session-upgrade-link" onclick="showUpgradeModal()">Upgrade to Pro</button> for extended coaching sessions
+      </div>` : ''}
+    </div>`;
+
+  // Set insight text safely (preserves line breaks)
+  document.body.appendChild(overlay);
+  document.getElementById('session-insight-text').textContent = finalMessage;
+
+  const saveBtn = document.getElementById('session-save-btn');
+  saveBtn.addEventListener('click', () => saveSessionSummary(finalMessage, saveBtn));
+
+  requestAnimationFrame(() => overlay.classList.add('visible'));
+}
+
+async function saveSessionSummary(summaryText, btn) {
+  const today = getTodayISO();
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    await api('PATCH', `/api/entries/${today}`, { coachSummary: summaryText });
+    if (btn) { btn.disabled = true; btn.textContent = 'Saved ✓'; }
+    showToast('Session summary saved to your journal!');
+  } catch (err) {
+    showToast('Could not save: ' + err.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Save to Journal'; }
+  }
+}
+
+function startNewEntry() {
+  document.getElementById('session-complete-overlay')?.remove();
+  const ta = document.getElementById('journal-input');
+  if (ta) { ta.value = ''; updateWordCount(ta); autoResizeTextarea(ta); }
+  clearMoodSelection();
+  clearDraft();
+  state.coachEntry    = '';
+  state.coachSessions = {};
+  document.getElementById('prompts-section')?.classList.add('hidden');
+  document.getElementById('journal-section')?.scrollIntoView({ behavior: 'smooth' });
+  ta?.focus();
 }
 
 

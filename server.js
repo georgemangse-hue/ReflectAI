@@ -1061,7 +1061,7 @@ const server = http.createServer(async (req, res) => {
       const user = requireAuth(req, res);
       if (!user) return;
       const entryDate      = entryEditMatch[1];
-      const { text, mood } = await readBody(req);
+      const { text, mood, coachSummary } = await readBody(req);
       const entries        = readJSON(entriesFile(user.id));
       const idx            = entries.findIndex(e => e.date === entryDate);
       if (idx === -1) return sendJSON(res, 404, { error: 'Entry not found.' });
@@ -1072,6 +1072,7 @@ const server = http.createServer(async (req, res) => {
         entries[idx].text = text.trim();
       }
       if (mood !== undefined) entries[idx].mood = VALID_MOODS.includes(mood) ? mood : null;
+      if (coachSummary !== undefined) entries[idx].coachSummary = typeof coachSummary === 'string' ? coachSummary.trim().slice(0, 5000) : null;
       entries[idx].updatedAt = Date.now();
       writeJSON(entriesFile(user.id), entries);
       return sendJSON(res, 200, { entry: entries[idx] });
@@ -1163,10 +1164,24 @@ Available categories (pick the 3 that best fit): Feelings, Mindset, Growth, Next
         return sendJSON(res, 400, { error: 'Missing or too-short conversation history.' });
 
       // Enforce per-plan exchange limits (history starts at 2; each exchange adds 2 entries + 1 pending user msg)
+      // Exchange 1 = initial /api/reflect call; coach handles exchanges 2-6 (free) or 2-10 (pro)
       const exchangeRequested = (messages.length - 1) / 2;
-      const coachLimit = (isSubscriptionActive(user) && user.plan === 'pro') ? 10 : 6;
+      const isPro = isSubscriptionActive(user) && user.plan === 'pro';
+      const coachLimit = isPro ? 9 : 5;
       if (exchangeRequested > coachLimit)
-        return sendJSON(res, 403, { error: `You've reached the ${coachLimit}-exchange limit for this session.`, code: 'COACH_LIMIT_REACHED' });
+        return sendJSON(res, 403, { error: `You've reached the session limit.`, code: 'COACH_LIMIT_REACHED' });
+
+      // Build exchange-aware closing guidance appended to system prompt
+      let closingGuidance = '';
+      if (exchangeRequested === coachLimit) {
+        closingGuidance = isPro
+          ? `\n\nIMPORTANT — THIS IS THE FINAL EXCHANGE (Exchange 10 of 10 for this Pro plan session). Deliver a complete and warm closing:\n1. A comprehensive summary of all key insights from this entire session\n2. Three specific, actionable growth steps for the week ahead (number them clearly)\n3. A personalised encouragement grounded in something specific they shared today\n4. End with exactly: "See you in your next entry 🌱"\nMake this feel like a real coaching session closing — complete, warm, and human.`
+          : `\n\nIMPORTANT — THIS IS THE FINAL EXCHANGE (Exchange 6 of 6 for this Free plan session). Deliver a warm closing:\n1. A 2-3 sentence summary of the key insight from this session\n2. One specific, actionable growth step to take before their next journal entry\n3. An encouraging closing message\n4. At the very end, gently and warmly add: "Want to go deeper? Upgrade to Pro for extended coaching sessions" — not as a sales pitch, just a genuine invitation.\nKeep the entire response warm and coach-like, never clinical.`;
+      } else if (exchangeRequested === coachLimit - 1) {
+        closingGuidance = isPro
+          ? `\n\nIMPORTANT — This is Exchange 9 of 10 (penultimate for this Pro plan session). Begin warmly bringing the session toward its close. Open your response with something like: "We've covered a lot of ground today — let's bring this session to a meaningful close..." Then reflect on what has been most significant in this conversation and ask one final question that will help them crystallise their insights before the final exchange.`
+          : `\n\nIMPORTANT — This is Exchange 5 of 6 (penultimate for this Free plan session). Start gently bringing the session toward a close. Open with something like: "We're coming to the end of today's reflection — let's bring this together..." Then reflect on what has been most meaningful and ask one last meaningful question to help crystallise their key insight.`;
+      }
 
       // Cap history to keep context manageable: always keep first 2 (entry + opening prompt), then last 10
       const trimmed = messages.length > 12
@@ -1193,9 +1208,9 @@ Rules:
 13. Use the journal entry (in the first message) as a reference — connect their current words back to specific things they wrote when it deepens the insight.
 14. Each exchange should leave the person feeling more understood AND more clear about something they couldn't quite articulate before.`;
 
-      const result  = await callClaude(trimmed, systemPrompt);
+      const result  = await callClaude(trimmed, systemPrompt + closingGuidance);
       const message = result.content[0].text;
-      return sendJSON(res, 200, { message });
+      return sendJSON(res, 200, { message, exchangesDone: exchangeRequested, coachLimit });
     }
 
     if (method === 'POST' && url === '/api/weekly-insight') {

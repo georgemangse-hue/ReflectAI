@@ -2780,3 +2780,165 @@ footer {
     justify-content: space-between;
   }
 }
+
+
+/* ================================================================
+   COACH PROGRESS INDICATOR
+================================================================ */
+.coach-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 0.75rem;
+}
+
+.coach-progress-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  min-width: 95px;
+  letter-spacing: 0.02em;
+}
+
+.coach-progress-track {
+  flex: 1;
+  height: 3px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.coach-progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 99px;
+  transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 0%;
+}
+
+
+/* ================================================================
+   SESSION COMPLETE OVERLAY
+================================================================ */
+.session-complete-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.52);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.session-complete-overlay.visible {
+  opacity: 1;
+}
+
+.session-complete-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2rem 2rem 1.5rem;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.22);
+  animation: fadeSlideUp 0.38s var(--ease-out) both;
+  text-align: center;
+}
+
+.session-complete-icon {
+  font-size: 1.75rem;
+  color: var(--primary);
+  margin-bottom: 0.4rem;
+  display: block;
+}
+
+.session-complete-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--heading);
+  margin-bottom: 0.85rem;
+}
+
+.session-complete-meta {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 1.2rem;
+}
+
+.session-meta-item {
+  font-size: 0.77rem;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: 99px;
+  padding: 0.22rem 0.7rem;
+  color: var(--text-muted);
+}
+
+.session-insight-box {
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 1rem 1.15rem;
+  text-align: left;
+  margin-bottom: 1.2rem;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.session-insight-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 0.45rem;
+}
+
+.session-insight-text {
+  font-size: 0.875rem;
+  color: var(--text);
+  line-height: 1.72;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.session-complete-actions {
+  display: flex;
+  gap: 0.7rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.session-upgrade-prompt {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-light);
+  padding-top: 0.85rem;
+  margin-top: 0.15rem;
+}
+
+.session-upgrade-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.session-upgrade-link:hover { opacity: 0.75; }
