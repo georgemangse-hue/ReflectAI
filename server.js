@@ -42,7 +42,7 @@ const APP_URL                    = process.env.APP_URL                    || `ht
 const ADMIN_SECRET           = process.env.ADMIN_SECRET           || crypto.randomBytes(16).toString('hex');
 const RESEND_API_KEY         = process.env.RESEND_API_KEY         || '';
 const EMAIL_FROM             = process.env.EMAIL_FROM             || 'ReflectAI <onboarding@resend.dev>';
-const RESET_TTL              = 60 * 60 * 1000; // 1 hour
+const RESET_TTL              = 24 * 60 * 60 * 1000; // 24 hours
 const FREE_ENTRY_LIMIT          = 3;
 const FREE_WEEKLY_INSIGHT_LIMIT = 1;
 const FREE_GOAL_LIMIT           = 1;
@@ -563,14 +563,89 @@ const server = http.createServer(async (req, res) => {
           const resetUrl = `${APP_URL}/reset.html?token=${token}`;
           console.log(`[forgot-password] Reset link for ${user.email}: ${resetUrl}`);
 
-          const html = `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:2rem;">
-<h2 style="color:#3a8f65;margin-bottom:0.5rem;">Reset your password</h2>
-<p style="color:#444;line-height:1.6;">You requested a password reset for your ReflectAI account. Click the button below to choose a new password.</p>
-<p style="margin:1.75rem 0;"><a href="${resetUrl}" style="background:#3a8f65;color:#fff;padding:0.75rem 1.5rem;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">Reset my password</a></p>
-<p style="color:#888;font-size:0.85rem;line-height:1.5;">This link expires in 1 hour. If you didn't request this, you can safely ignore this email — your account has not been changed.</p>
-<hr style="border:none;border-top:1px solid #eee;margin:1.5rem 0;"/>
-<p style="color:#aaa;font-size:0.78rem;">ReflectAI · Your private journaling space</p>
-</div>`;
+          const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+<body style="margin:0;padding:0;background:#f4f7f4;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f4;padding:40px 16px;">
+  <tr><td align="center">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.08);">
+
+      <!-- Header / Logo -->
+      <tr>
+        <td style="background:#3a8f65;padding:28px 40px;text-align:center;">
+          <div style="display:inline-block;">
+            <span style="font-size:22px;vertical-align:middle;">🌿</span>
+            <span style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.3px;vertical-align:middle;">&nbsp;ReflectAI</span>
+          </div>
+          <p style="color:#c8e6d8;font-size:13px;margin:6px 0 0;letter-spacing:0.02em;">Your private journaling space</p>
+        </td>
+      </tr>
+
+      <!-- Body -->
+      <tr>
+        <td style="padding:40px 40px 32px;">
+          <h1 style="color:#1a2e24;font-size:22px;font-weight:700;margin:0 0 12px;line-height:1.3;">Reset your password</h1>
+          <p style="color:#4a5e52;font-size:15px;line-height:1.7;margin:0 0 28px;">
+            You requested a password reset for your ReflectAI account. Click the button below to set a new password. This link expires in <strong>24 hours</strong>.
+          </p>
+
+          <!-- CTA Button -->
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+            <tr>
+              <td style="background:#3a8f65;border-radius:8px;">
+                <a href="${resetUrl}"
+                   style="display:inline-block;padding:14px 32px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;letter-spacing:0.01em;border-radius:8px;">
+                  Reset my password
+                </a>
+              </td>
+            </tr>
+          </table>
+
+          <!-- Fallback link -->
+          <p style="color:#8a9e92;font-size:12px;line-height:1.6;margin:0 0 4px;">Button not working? Copy and paste this link into your browser:</p>
+          <p style="margin:0;"><a href="${resetUrl}" style="color:#3a8f65;font-size:12px;word-break:break-all;">${resetUrl}</a></p>
+        </td>
+      </tr>
+
+      <!-- Divider -->
+      <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e8f0eb;margin:0;"/></td></tr>
+
+      <!-- Footer note -->
+      <tr>
+        <td style="padding:24px 40px 16px;">
+          <p style="color:#8a9e92;font-size:13px;line-height:1.65;margin:0;">
+            If you didn't request this reset, please ignore this email. Your account is safe.
+          </p>
+        </td>
+      </tr>
+
+      <!-- Sign-off -->
+      <tr>
+        <td style="padding:0 40px 32px;">
+          <p style="color:#4a5e52;font-size:13px;line-height:1.6;margin:0;">
+            Warm regards,<br/>
+            <strong>The ReflectAI Team</strong><br/>
+            <span style="color:#8a9e92;">PremierLEADZ Consulting Ltd</span>
+          </p>
+        </td>
+      </tr>
+
+      <!-- Bottom bar -->
+      <tr>
+        <td style="background:#f4f7f4;padding:16px 40px;text-align:center;border-top:1px solid #e8f0eb;">
+          <p style="color:#b0bdb4;font-size:11px;margin:0;line-height:1.5;">
+            © ${new Date().getFullYear()} PremierLEADZ Consulting Ltd · ReflectAI<br/>
+            This is an automated message — please do not reply to this email.
+          </p>
+        </td>
+      </tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
 
           try { await sendEmail(user.email, 'Reset your ReflectAI password', html); }
           catch (err) { console.error('[forgot-password] email send failed:', err.message); }
