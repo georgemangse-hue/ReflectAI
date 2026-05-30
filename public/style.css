@@ -2942,3 +2942,184 @@ footer {
   text-underline-offset: 2px;
 }
 .session-upgrade-link:hover { opacity: 0.75; }
+
+
+/* ================================================================
+   ONBOARDING OVERLAY
+================================================================ */
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.48);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.onboarding-overlay.visible { opacity: 1; }
+
+.onboarding-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--primary);
+  border-radius: var(--radius);
+  padding: 2.25rem 2rem 1.75rem;
+  max-width: 460px;
+  width: 100%;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  animation: fadeSlideUp 0.4s var(--ease-out) both;
+  text-align: center;
+}
+
+.onboarding-logo {
+  font-size: 2rem;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.onboarding-celebrate {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.onboarding-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--heading);
+  margin-bottom: 0.55rem;
+  line-height: 1.3;
+}
+
+.onboarding-subtitle {
+  font-size: 0.93rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+  margin-bottom: 1.5rem;
+}
+
+.onboarding-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.75rem;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.onboarding-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  line-height: 1.55;
+}
+.onboarding-feature-icon {
+  font-size: 1.05rem;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+.onboarding-cta {
+  width: 100%;
+  padding: 0.85rem;
+  font-size: 0.975rem;
+  margin-bottom: 0.85rem;
+}
+
+.onboarding-skip {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+.onboarding-skip-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.onboarding-next-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.75rem;
+  text-align: left;
+}
+.onboarding-step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  line-height: 1.55;
+}
+.onboarding-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+/* Writing tip banner */
+.onboarding-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: var(--primary-light);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.875rem;
+  color: var(--text);
+  line-height: 1.6;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.onboarding-tip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.onboarding-tip-icon {
+  color: var(--primary);
+  font-size: 0.95rem;
+  flex-shrink: 0;
+  margin-top: 0.12rem;
+}
+.onboarding-tip-text { flex: 1; }
+.onboarding-tip-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+  opacity: 0.55;
+  transition: opacity var(--ease);
+}
+.onboarding-tip-close:hover { opacity: 1; }

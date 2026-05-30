@@ -17,15 +17,16 @@
    12. Streak
    13. Journal form
    14. Reflection prompts
-   15. Weekly insight
-   16. Goals (Pro)
-   17. History
-   18. Theme toggle
-   19. Scroll-reveal
-   20. Textarea auto-resize
-   21. Toast
-   22. Security — escapeHTML
-   23. Boot
+   15. Onboarding
+   16. Weekly insight
+   17. Goals (Pro)
+   18. History
+   19. Theme toggle
+   20. Scroll-reveal
+   21. Textarea auto-resize
+   22. Toast
+   23. Security — escapeHTML
+   24. Boot
 ================================================================ */
 
 
@@ -62,7 +63,8 @@ const state = {
   countryOverride:     null,  // set when user clicks "Switch currency"
   userPlan:            'free', // 'free' or 'pro'
   coachEntry:          '',    // journal text for the current coach session
-  coachSessions:       {}     // keyed by prompt index: { history: [{role,content}] }
+  coachSessions:       {},    // keyed by prompt index: { history: [{role,content}] }
+  onboarding:          { active: false, step: 0 }
 };
 
 
@@ -722,6 +724,7 @@ function initApp() {
 async function loadAppData() {
   await loadEntries();
   await loadGoals();
+  if (shouldShowOnboarding()) startOnboarding();
 }
 
 
@@ -1123,6 +1126,10 @@ async function fetchReflectionPrompts(entryText) {
     });
     result.classList.remove('hidden');
     showToast('✦ Entry saved and prompts generated!');
+    // Onboarding hook: advance to celebration screen after first entry
+    if (state.onboarding.active && state.onboarding.step === 2) {
+      setTimeout(() => advanceOnboarding(), 700);
+    }
   } catch (err) {
     error.textContent = `Couldn't get reflection prompts: ${err.message}`;
     error.classList.remove('hidden');
@@ -1340,7 +1347,126 @@ function startNewEntry() {
 
 
 /* ================================================================
-   15. WEEKLY INSIGHT  (Pro)
+   15. ONBOARDING
+================================================================ */
+const ONBOARDED_KEY = 'reflectai_onboarded';
+
+function shouldShowOnboarding() {
+  if (localStorage.getItem(ONBOARDED_KEY)) return false;
+  return state.entries.length === 0;
+}
+
+function startOnboarding() {
+  state.onboarding = { active: true, step: 1 };
+  showOnboardingOverlay(1);
+}
+
+function showOnboardingOverlay(step) {
+  document.getElementById('onboarding-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id        = 'onboarding-overlay';
+  overlay.className = 'onboarding-overlay';
+
+  if (step === 1) {
+    overlay.innerHTML = `
+      <div class="onboarding-card">
+        <div class="onboarding-logo">✦</div>
+        <h2 class="onboarding-title">Welcome to ReflectAI</h2>
+        <p class="onboarding-subtitle">Your private space to think clearly, feel heard, and grow — one entry at a time.</p>
+        <ul class="onboarding-features">
+          <li><span class="onboarding-feature-icon">✍️</span><span>Write freely — no rules, no judgement, no audience</span></li>
+          <li><span class="onboarding-feature-icon">🤖</span><span>Get 3 AI reflection prompts crafted for exactly what <em>you</em> wrote</span></li>
+          <li><span class="onboarding-feature-icon">💬</span><span>Go deeper with a private coaching conversation built around your entry</span></li>
+        </ul>
+        <button class="btn btn-primary onboarding-cta" onclick="advanceOnboarding()">Write my first entry →</button>
+        <p class="onboarding-skip">Already know the app? <button class="onboarding-skip-link" onclick="completeOnboarding()">Skip intro</button></p>
+      </div>`;
+  } else if (step === 3) {
+    overlay.innerHTML = `
+      <div class="onboarding-card">
+        <div class="onboarding-celebrate">🎉</div>
+        <h2 class="onboarding-title">Your first reflection is ready!</h2>
+        <p class="onboarding-subtitle">Claude read exactly what you wrote and crafted these questions just for you — not generic advice, but a real conversation starter.</p>
+        <div class="onboarding-next-steps">
+          <div class="onboarding-step-item">
+            <span class="onboarding-step-num">1</span>
+            <span>Pick the prompt that resonates most with you</span>
+          </div>
+          <div class="onboarding-step-item">
+            <span class="onboarding-step-num">2</span>
+            <span>Tap <strong>Explore this →</strong> to begin a coaching conversation</span>
+          </div>
+          <div class="onboarding-step-item">
+            <span class="onboarding-step-num">3</span>
+            <span>Come back tomorrow to keep your streak going 🔥</span>
+          </div>
+        </div>
+        <button class="btn btn-primary onboarding-cta" onclick="completeOnboarding()">See my prompts →</button>
+      </div>`;
+  }
+
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('visible'));
+}
+
+function advanceOnboarding() {
+  const step = state.onboarding.step;
+
+  if (step === 1) {
+    // Close welcome → go to guided writing
+    document.getElementById('onboarding-overlay')?.remove();
+    state.onboarding.step = 2;
+
+    // Pre-fill textarea with a soft starter prompt
+    const ta = document.getElementById('journal-input');
+    if (ta && !ta.value.trim()) {
+      ta.value = 'Right now, the thing that\'s most on my mind is ';
+      updateWordCount(ta);
+      autoResizeTextarea(ta);
+    }
+
+    // Show the floating writing tip
+    showOnboardingTip();
+
+    // Scroll to journal and focus
+    document.getElementById('journal-section')?.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => ta?.setSelectionRange(ta.value.length, ta.value.length) || ta?.focus(), 650);
+  } else if (step === 2) {
+    // Prompts generated — advance to celebration
+    state.onboarding.step = 3;
+    showOnboardingOverlay(3);
+  }
+}
+
+function showOnboardingTip() {
+  document.getElementById('onboarding-tip')?.remove();
+  const tip = document.createElement('div');
+  tip.id        = 'onboarding-tip';
+  tip.className = 'onboarding-tip';
+  tip.innerHTML = `
+    <span class="onboarding-tip-icon">✦</span>
+    <span class="onboarding-tip-text">Write anything that's on your mind — even a few sentences. Claude will respond to what <em>you</em> actually wrote, not a template.</span>
+    <button class="onboarding-tip-close" onclick="document.getElementById('onboarding-tip')?.remove()" aria-label="Dismiss tip">×</button>`;
+
+  const form = document.getElementById('journal-form');
+  form?.parentNode?.insertBefore(tip, form);
+  requestAnimationFrame(() => tip.classList.add('visible'));
+}
+
+function completeOnboarding() {
+  localStorage.setItem(ONBOARDED_KEY, '1');
+  state.onboarding = { active: false, step: 0 };
+  const overlay = document.getElementById('onboarding-overlay');
+  if (overlay) {
+    overlay.classList.remove('visible');
+    setTimeout(() => overlay.remove(), 320);
+  }
+  document.getElementById('onboarding-tip')?.remove();
+}
+
+
+/* ================================================================
+   16. WEEKLY INSIGHT  (Pro)
 ================================================================ */
 async function generateWeeklyInsight() {
   const loader = document.getElementById('insight-loader');
@@ -1373,7 +1499,7 @@ async function generateWeeklyInsight() {
 
 
 /* ================================================================
-   16. GOALS  (Pro)
+   17. GOALS  (Pro)
 ================================================================ */
 async function loadGoals() {
   try {
