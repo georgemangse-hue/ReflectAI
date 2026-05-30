@@ -245,12 +245,14 @@ async function handleSignup(event) {
   if (password !== confirm) { setAuthError('Passwords do not match.'); return; }
   btn.disabled = true; btn.textContent = 'Creating account…';
   try {
+    const refCode = localStorage.getItem('reflectai_ref') || '';
     const res  = await fetch('/api/auth/signup', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password, referralCode: refCode })
     });
     const data = await res.json();
     if (data.error) { setAuthError(data.error); return; }
+    localStorage.removeItem('reflectai_ref');
     onAuthSuccess(data.token, data.user);
   } catch { setAuthError('Could not connect to the server. Is it running?'); }
   finally { btn.disabled = false; btn.textContent = 'Create account'; }
@@ -767,6 +769,7 @@ function initApp() {
 async function loadAppData() {
   await loadEntries();
   await loadGoals();
+  loadReferralStats(); // fire-and-forget — updates dropdown when ready
   if (shouldShowOnboarding()) startOnboarding();
 }
 
@@ -1349,7 +1352,9 @@ function showSessionComplete(finalMessage) {
       </div>
       ${!isPro ? `<div class="session-upgrade-prompt">
         Want to go deeper? <button class="session-upgrade-link" onclick="showUpgradeModal()">Upgrade to Pro</button> for extended coaching sessions
-      </div>` : ''}
+      </div>` : `<div class="session-upgrade-prompt">
+        Enjoyed today's session? <a href="/referral.html" class="session-upgrade-link">Share ReflectAI with a friend</a> and earn a free month
+      </div>`}
     </div>`;
 
   // Set insight text safely (preserves line breaks)
@@ -1390,7 +1395,41 @@ function startNewEntry() {
 
 
 /* ================================================================
-   15. ONBOARDING
+   15. REFERRAL
+================================================================ */
+function captureReferralCode() {
+  const params = new URLSearchParams(window.location.search);
+  const ref = params.get('ref');
+  if (ref && /^[a-z0-9]{5,12}$/.test(ref)) {
+    localStorage.setItem('reflectai_ref', ref);
+    // Remove ref from URL without reload
+    const clean = window.location.pathname;
+    window.history.replaceState({}, '', clean);
+  }
+}
+
+async function loadReferralStats() {
+  try {
+    const data = await api('GET', '/api/referral');
+    if (!data) return;
+
+    // Update credit badge in dropdown
+    const creditEl = document.getElementById('dropdown-referral-credit');
+    if (creditEl) {
+      if (data.stats.creditsEarned > 0) {
+        const remaining = data.stats.creditsEarned - data.stats.totalConverted;
+        creditEl.textContent = remaining > 0
+          ? `🎁 You have ${remaining} month${remaining > 1 ? 's' : ''} of free credit`
+          : `🎁 ${data.stats.creditsEarned} referral credit${data.stats.creditsEarned > 1 ? 's' : ''} earned`;
+        creditEl.classList.remove('hidden');
+      }
+    }
+  } catch { /* non-critical */ }
+}
+
+
+/* ================================================================
+   16. ONBOARDING
 ================================================================ */
 const ONBOARDED_KEY = 'reflectai_onboarded';
 
@@ -1943,6 +1982,7 @@ async function triggerPwaInstall() {
    24. BOOT
 ================================================================ */
 document.addEventListener('DOMContentLoaded', async () => {
+  captureReferralCode();
   initTheme();
   initApp();
   initScrollReveal();

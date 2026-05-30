@@ -72,6 +72,7 @@ const DATA_DIR       = process.env.DATA_DIR || path.join(__dirname, 'data');
 const USERS_FILE     = path.join(DATA_DIR, 'users.json');
 const SESSIONS_FILE  = path.join(DATA_DIR, 'sessions.json');
 const RESETS_FILE    = path.join(DATA_DIR, 'password_resets.json');
+const REFERRALS_FILE = path.join(DATA_DIR, 'referrals.json');
 const ENTRIES_DIR    = path.join(DATA_DIR, 'entries');
 const GOALS_DIR      = path.join(DATA_DIR, 'goals');
 const FEEDBACK_FILE  = path.join(DATA_DIR, 'feedback.json');
@@ -84,7 +85,8 @@ const FEEDBACK_FILE  = path.join(DATA_DIR, 'feedback.json');
 });
 if (!fs.existsSync(USERS_FILE))    fs.writeFileSync(USERS_FILE,    '[]');
 if (!fs.existsSync(SESSIONS_FILE)) fs.writeFileSync(SESSIONS_FILE, '[]');
-if (!fs.existsSync(RESETS_FILE))   fs.writeFileSync(RESETS_FILE,   '[]');
+if (!fs.existsSync(RESETS_FILE))     fs.writeFileSync(RESETS_FILE,     '[]');
+if (!fs.existsSync(REFERRALS_FILE)) fs.writeFileSync(REFERRALS_FILE, '[]');
 if (!fs.existsSync(FEEDBACK_FILE)) fs.writeFileSync(FEEDBACK_FILE, '[]');
 
 /* ================================================================
@@ -491,6 +493,133 @@ function sendSubscriptionConfirmationEmail(email, expiry) {
   );
 }
 
+/* ================================================================
+   REFERRAL HELPERS
+================================================================ */
+function generateReferralCode() {
+  const chars  = 'abcdefghjkmnpqrstuvwxyz23456789'; // no confusable chars
+  const taken  = new Set(readJSON(USERS_FILE).map(u => u.referralCode).filter(Boolean));
+  let code;
+  do {
+    const bytes = crypto.randomBytes(6);
+    code = Array.from(bytes).map(b => chars[b % chars.length]).join('');
+  } while (taken.has(code));
+  return code;
+}
+
+function sendReferralNotificationEmail(to, friendName) {
+  const year = new Date().getFullYear();
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+<body style="margin:0;padding:0;background:#f4f7f4;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f4;padding:40px 16px;">
+  <tr><td align="center">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.08);">
+      <tr>
+        <td style="background:#3a8f65;padding:28px 40px;text-align:center;">
+          <span style="font-size:22px;vertical-align:middle;">🌿</span>
+          <span style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.3px;vertical-align:middle;">&nbsp;ReflectAI</span>
+          <p style="color:#c8e6d8;font-size:13px;margin:6px 0 0;letter-spacing:0.02em;">Learn | Grow | Succeed</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:40px 40px 32px;">
+          <h1 style="color:#1a2e24;font-size:22px;font-weight:700;margin:0 0 12px;">Great news! 🎉</h1>
+          <p style="color:#4a5e52;font-size:15px;line-height:1.7;margin:0 0 20px;">
+            <strong>${friendName}</strong> just joined ReflectAI using your referral link. One free month has been added to your account!
+          </p>
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 28px;width:100%;">
+            <tr><td style="background:#f4f7f4;border-radius:8px;padding:16px 20px;text-align:center;">
+              <p style="color:#3a8f65;font-size:32px;font-weight:700;margin:0 0 4px;">+1 month free</p>
+              <p style="color:#8a9e92;font-size:13px;margin:0;">added to your ReflectAI subscription</p>
+            </td></tr>
+          </table>
+          <p style="color:#4a5e52;font-size:14px;line-height:1.7;margin:0 0 24px;">Keep sharing your referral link to earn more — up to 12 free months per year.</p>
+          <table cellpadding="0" cellspacing="0">
+            <tr><td style="background:#3a8f65;border-radius:8px;">
+              <a href="${APP_URL}/referral.html" style="display:inline-block;padding:13px 28px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;">View my referrals →</a>
+            </td></tr>
+          </table>
+        </td>
+      </tr>
+      <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e8f0eb;margin:0;"/></td></tr>
+      <tr>
+        <td style="padding:24px 40px 32px;">
+          <p style="color:#4a5e52;font-size:13px;line-height:1.6;margin:0;">
+            Warm regards,<br/>
+            <strong>The ReflectAI Team</strong><br/>
+            <span style="color:#8a9e92;">PremierLEADZ Consulting Ltd</span>
+          </p>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#f4f7f4;padding:16px 40px;text-align:center;border-top:1px solid #e8f0eb;">
+          <p style="color:#b0bdb4;font-size:11px;margin:0;line-height:1.5;">
+            © ${year} PremierLEADZ Consulting Ltd · ReflectAI<br/>
+            This is an automated message — please do not reply to this email.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+  return sendEmail(to, `${friendName} just joined ReflectAI using your link 🎉`, html);
+}
+
+async function applyReferralCredit(paidUser) {
+  if (!paidUser.referredBy) return;
+
+  const referrals = readJSON(REFERRALS_FILE);
+  const idx = referrals.findIndex(r => r.referredUserId === paidUser.id && !r.convertedAt);
+  if (idx === -1) return; // no pending referral record
+
+  const referrer = readJSON(USERS_FILE).find(u => u.id === paidUser.referredBy);
+  if (!referrer || referrer.id === paidUser.id) return; // self-referral guard
+
+  // Yearly cap: max 12 credits per calendar year
+  const year = String(new Date().getFullYear());
+  const yearlyCount = referrer.referralCreditYearlyCount?.[year] || 0;
+  if (yearlyCount >= 12) {
+    console.log(`[referral] ${referrer.email} has hit the 12-credit yearly cap`);
+    return;
+  }
+
+  const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+  const now         = Date.now();
+
+  // Extend referred user's subscription by a bonus 30 days (first month free)
+  const bonusExpiry = Math.max(paidUser.subscriptionExpiry || now, now) + THIRTY_DAYS;
+  updateUser(paidUser.id, { subscriptionExpiry: bonusExpiry });
+
+  // Credit the referrer: extend their subscription by 30 days
+  const referrerExpiry = Math.max(referrer.subscriptionExpiry || now, now) + THIRTY_DAYS;
+  updateUser(referrer.id, {
+    plan:               'pro',
+    paid:               true,
+    subscriptionStatus: (referrer.paid && referrer.subscriptionStatus === 'active') ? 'active' : 'active',
+    subscriptionExpiry: referrerExpiry,
+    referralCredits:    (referrer.referralCredits || 0) + 1,
+    referralCreditYearlyCount: { ...(referrer.referralCreditYearlyCount || {}), [year]: yearlyCount + 1 }
+  });
+
+  // Mark referral as converted
+  referrals[idx].convertedAt      = now;
+  referrals[idx].creditedReferrer = true;
+  referrals[idx].creditedReferred = true;
+  writeJSON(REFERRALS_FILE, referrals);
+
+  // Notify the referrer by email
+  const handle     = paidUser.email.split('@')[0].split(/[._-]/)[0].slice(0, 20);
+  const friendName = handle.charAt(0).toUpperCase() + handle.slice(1);
+  sendReferralNotificationEmail(referrer.email, friendName)
+    .catch(err => console.error('[referral] notification email failed:', err.message));
+
+  console.log(`[referral] Credited: referrer=${referrer.email}, referred=${paidUser.email}`);
+}
+
 const VALID_MOODS = ['motivated', 'happy', 'grateful', 'tired', 'anxious', 'sad', 'overwhelmed'];
 
 /* ================================================================
@@ -557,7 +686,7 @@ const server = http.createServer(async (req, res) => {
        AUTH
     ============================================================== */
     if (method === 'POST' && url === '/api/auth/signup') {
-      const { email, password } = await readBody(req);
+      const { email, password, referralCode: inboundRefCode } = await readBody(req);
       if (!email || !email.includes('@') || !email.includes('.'))
         return sendJSON(res, 400, { error: 'Please enter a valid email address.' });
       if (!password || password.length < 8)
@@ -567,14 +696,34 @@ const server = http.createServer(async (req, res) => {
       if (users.find(u => u.email.toLowerCase() === email.toLowerCase().trim()))
         return sendJSON(res, 409, { error: 'An account with this email already exists.' });
 
+      // Resolve referrer (must exist, must not be same email)
+      const referrer = inboundRefCode
+        ? users.find(u => u.referralCode === inboundRefCode && u.email.toLowerCase() !== email.toLowerCase().trim())
+        : null;
+
       const salt = crypto.randomBytes(32).toString('hex');
       const user = {
         id: generateId(), email: email.toLowerCase().trim(),
         passwordHash: hashPassword(password, salt), salt,
-        plan: 'free', paid: false, createdAt: Date.now()
+        plan: 'free', paid: false, createdAt: Date.now(),
+        referralCode:   generateReferralCode(),
+        referredBy:     referrer?.id || null,
+        referralCredits: 0
       };
       users.push(user);
       writeJSON(USERS_FILE, users);
+
+      // Create pending referral record
+      if (referrer) {
+        const referrals = readJSON(REFERRALS_FILE);
+        referrals.push({
+          id: generateId(), referrerId: referrer.id,
+          referredUserId: user.id, referredEmail: user.email,
+          signedUpAt: Date.now(), convertedAt: null,
+          creditedReferrer: false, creditedReferred: false
+        });
+        writeJSON(REFERRALS_FILE, referrals);
+      }
 
       const token = generateToken();
       const sessions = readJSON(SESSIONS_FILE);
@@ -746,6 +895,32 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { ok: true });
     }
 
+    if (method === 'GET' && url === '/api/referral') {
+      const user = requireAuth(req, res);
+      if (!user) return;
+
+      // Generate code on-the-fly for users who signed up before this feature
+      let code = user.referralCode;
+      if (!code) {
+        code = generateReferralCode();
+        updateUser(user.id, { referralCode: code });
+      }
+
+      const referrals  = readJSON(REFERRALS_FILE).filter(r => r.referrerId === user.id);
+      const converted  = referrals.filter(r => r.convertedAt);
+      const credits    = user.referralCredits || 0;
+
+      return sendJSON(res, 200, {
+        code,
+        link:  `${APP_URL}/join?ref=${code}`,
+        stats: {
+          totalReferred:  referrals.length,
+          totalConverted: converted.length,
+          creditsEarned:  credits
+        }
+      });
+    }
+
     if (method === 'GET' && url === '/api/auth/me') {
       const user = requireAuth(req, res);
       if (!user) return;
@@ -779,6 +954,7 @@ const server = http.createServer(async (req, res) => {
         });
         const updated = readJSON(USERS_FILE).find(u => u.id === user.id);
         sendSubscriptionConfirmationEmail(user.email, expiry);
+        applyReferralCredit(updated);
         return sendJSON(res, 200, { ok: true, user: userShape(updated) });
       }
 
@@ -812,6 +988,7 @@ const server = http.createServer(async (req, res) => {
       });
       const updated = readJSON(USERS_FILE).find(u => u.id === user.id);
       sendSubscriptionConfirmationEmail(user.email, paystackExpiry);
+      applyReferralCredit(updated);
       return sendJSON(res, 200, { ok: true, user: userShape(updated) });
     }
 
@@ -837,6 +1014,7 @@ const server = http.createServer(async (req, res) => {
         });
         const updated = readJSON(USERS_FILE).find(u => u.id === user.id);
         sendSubscriptionConfirmationEmail(user.email, flwExpiry);
+        applyReferralCredit(updated);
         return sendJSON(res, 200, { ok: true, user: userShape(updated) });
       }
 
@@ -877,6 +1055,7 @@ const server = http.createServer(async (req, res) => {
       });
       const updated = readJSON(USERS_FILE).find(u => u.id === user.id);
       sendSubscriptionConfirmationEmail(user.email, flwLiveExpiry);
+      applyReferralCredit(updated);
       return sendJSON(res, 200, { ok: true, user: userShape(updated) });
     }
 
@@ -1140,6 +1319,7 @@ const server = http.createServer(async (req, res) => {
       });
       const updated = readJSON(USERS_FILE).find(u => u.id === user.id);
       sendSubscriptionConfirmationEmail(user.email, stripeExpiry);
+      applyReferralCredit(updated);
       return sendJSON(res, 200, { ok: true, user: userShape(updated) });
     }
 
@@ -1587,7 +1767,7 @@ Your check-in should note any specific evidence from the journal entries that re
     /* ==============================================================
        STATIC FILES
     ============================================================== */
-    const urlPath  = (url === '/' ? '/index.html' : url === '/admin' ? '/admin.html' : url === '/demo' ? '/demo.html' : url);
+    const urlPath  = (url === '/' ? '/index.html' : url === '/admin' ? '/admin.html' : url === '/demo' ? '/demo.html' : url === '/join' ? '/index.html' : url);
     const filePath = path.resolve(PUBLIC, '.' + urlPath);
     if (!filePath.startsWith(PUBLIC + path.sep) && filePath !== PUBLIC) {
       res.writeHead(403); return res.end('Forbidden');

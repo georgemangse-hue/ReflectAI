@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invite a Friend – ReflectAI</title>
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    (function () {
+      var saved = localStorage.getItem('reflectai_theme');
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', saved || (prefersDark ? 'dark' : 'light'));
+    })();
+  </script>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner container">
+    <a href="/" class="nav-logo">🌿 <strong>Reflect</strong>AI</a>
+    <a href="/" class="btn btn-ghost btn-sm">← Back to Journal</a>
+  </div>
+</nav>
+
+<main class="referral-page container">
+
+  <!-- Hero -->
+  <div class="referral-hero">
+    <div class="referral-hero-icon">🎁</div>
+    <h1 class="referral-hero-title">Invite a Friend, Earn a Free Month</h1>
+    <p class="referral-hero-sub">Share your unique link. When a friend subscribes, you both get one month free — automatically.</p>
+  </div>
+
+  <!-- Loading / Error -->
+  <div id="ref-loading" class="referral-card referral-status-card">
+    <div class="loader"><div class="spinner"></div> Loading your referral link…</div>
+  </div>
+  <div id="ref-error" class="referral-card referral-status-card hidden">
+    <p class="error-msg">Could not load your referral link. <a href="/">Log in to ReflectAI</a> first.</p>
+  </div>
+
+  <!-- Main content (shown after load) -->
+  <div id="ref-content" class="hidden">
+
+    <!-- Your link -->
+    <div class="referral-card">
+      <h2 class="referral-card-title">Your Referral Link</h2>
+      <p class="referral-card-sub">Anyone who signs up using this link gets their first month free. You earn one free month when they subscribe.</p>
+      <div class="referral-link-row">
+        <input type="text" id="referral-link-input" class="referral-link-input" readonly />
+        <button class="btn btn-primary referral-copy-btn" id="referral-copy-btn" onclick="copyReferralLink()">Copy link</button>
+      </div>
+      <p id="referral-copy-toast" class="referral-copy-confirm hidden">✓ Copied to clipboard!</p>
+    </div>
+
+    <!-- Share buttons -->
+    <div class="referral-card">
+      <h2 class="referral-card-title">Share via</h2>
+      <div class="referral-share-grid">
+
+        <button class="referral-share-btn referral-share-whatsapp" onclick="shareWhatsApp()">
+          <span class="referral-share-icon">📱</span>
+          <span class="referral-share-label">WhatsApp</span>
+        </button>
+
+        <button class="referral-share-btn referral-share-twitter" onclick="shareTwitter()">
+          <span class="referral-share-icon">𝕏</span>
+          <span class="referral-share-label">Twitter / X</span>
+        </button>
+
+        <button class="referral-share-btn referral-share-linkedin" onclick="shareLinkedIn()">
+          <span class="referral-share-icon">in</span>
+          <span class="referral-share-label">LinkedIn</span>
+        </button>
+
+      </div>
+
+      <!-- Pre-written messages -->
+      <div class="referral-messages">
+        <div class="referral-message-item">
+          <p class="referral-message-label">📱 WhatsApp message</p>
+          <p class="referral-message-text" id="msg-whatsapp"></p>
+        </div>
+        <div class="referral-message-item">
+          <p class="referral-message-label">𝕏 Twitter / LinkedIn message</p>
+          <p class="referral-message-text" id="msg-twitter"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="referral-card">
+      <h2 class="referral-card-title">Your Referral Stats</h2>
+      <div class="referral-stats-grid">
+        <div class="referral-stat-item">
+          <span class="referral-stat-number" id="stat-referred">—</span>
+          <span class="referral-stat-label">Friends referred</span>
+        </div>
+        <div class="referral-stat-item">
+          <span class="referral-stat-number" id="stat-converted">—</span>
+          <span class="referral-stat-label">Subscribed</span>
+        </div>
+        <div class="referral-stat-item">
+          <span class="referral-stat-number" id="stat-credits">—</span>
+          <span class="referral-stat-label">Free months earned</span>
+        </div>
+      </div>
+      <p class="referral-stats-note">Credits are applied automatically. You can earn up to 12 free months per year.</p>
+    </div>
+
+  </div>
+</main>
+
+<script>
+  let _link = '';
+
+  async function loadReferral() {
+    const token = localStorage.getItem('reflectai_token');
+    if (!token) { show('ref-error'); return; }
+
+    try {
+      const res  = await fetch('/api/referral', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+
+      _link = data.link;
+
+      document.getElementById('referral-link-input').value = data.link;
+      document.getElementById('stat-referred').textContent  = data.stats.totalReferred;
+      document.getElementById('stat-converted').textContent = data.stats.totalConverted;
+      document.getElementById('stat-credits').textContent   = data.stats.creditsEarned;
+
+      const waMsg = `I've been using ReflectAI for AI-powered journaling and personal development. Use my link for one free month: ${data.link}`;
+      const txMsg = `Growing daily with ReflectAI — Nigeria's first AI journaling app. Get your first month free: ${data.link}`;
+
+      document.getElementById('msg-whatsapp').textContent = waMsg;
+      document.getElementById('msg-twitter').textContent  = txMsg;
+
+      show('ref-content');
+    } catch {
+      show('ref-error');
+    }
+  }
+
+  function show(id) {
+    document.getElementById('ref-loading').classList.add('hidden');
+    document.getElementById(id).classList.remove('hidden');
+  }
+
+  function copyReferralLink() {
+    navigator.clipboard.writeText(_link).then(() => {
+      const toast = document.getElementById('referral-copy-toast');
+      const btn   = document.getElementById('referral-copy-btn');
+      btn.textContent = 'Copied!';
+      toast.classList.remove('hidden');
+      setTimeout(() => { btn.textContent = 'Copy link'; toast.classList.add('hidden'); }, 2500);
+    }).catch(() => {
+      const el = document.getElementById('referral-link-input');
+      el.select(); el.setSelectionRange(0, 99999);
+      document.execCommand('copy');
+    });
+  }
+
+  function shareWhatsApp() {
+    const msg = document.getElementById('msg-whatsapp').textContent;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+  }
+
+  function shareTwitter() {
+    const msg = document.getElementById('msg-twitter').textContent;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(msg)}`, '_blank');
+  }
+
+  function shareLinkedIn() {
+    const msg = document.getElementById('msg-twitter').textContent;
+    window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(_link)}&summary=${encodeURIComponent(msg)}`, '_blank');
+  }
+
+  loadReferral();
+</script>
+</body>
+</html>
