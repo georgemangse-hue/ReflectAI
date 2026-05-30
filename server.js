@@ -40,6 +40,9 @@ const FLUTTERWAVE_PUBLIC_KEY     = process.env.FLUTTERWAVE_PUBLIC_KEY     || '';
 const FLUTTERWAVE_SECRET_KEY     = process.env.FLUTTERWAVE_SECRET_KEY     || '';
 const APP_URL                    = process.env.APP_URL                    || `http://localhost:${PORT}`;
 const ADMIN_SECRET           = process.env.ADMIN_SECRET           || crypto.randomBytes(16).toString('hex');
+const RESEND_API_KEY         = process.env.RESEND_API_KEY         || '';
+const EMAIL_FROM             = process.env.EMAIL_FROM             || 'ReflectAI <onboarding@resend.dev>';
+const RESET_TTL              = 60 * 60 * 1000; // 1 hour
 const FREE_ENTRY_LIMIT          = 3;
 const FREE_WEEKLY_INSIGHT_LIMIT = 1;
 const FREE_GOAL_LIMIT           = 1;
@@ -66,6 +69,7 @@ const PUBLIC              = path.join(__dirname, 'public');
 const DATA_DIR       = process.env.DATA_DIR || path.join(__dirname, 'data');
 const USERS_FILE     = path.join(DATA_DIR, 'users.json');
 const SESSIONS_FILE  = path.join(DATA_DIR, 'sessions.json');
+const RESETS_FILE    = path.join(DATA_DIR, 'password_resets.json');
 const ENTRIES_DIR    = path.join(DATA_DIR, 'entries');
 const GOALS_DIR      = path.join(DATA_DIR, 'goals');
 const FEEDBACK_FILE  = path.join(DATA_DIR, 'feedback.json');
@@ -78,6 +82,7 @@ const FEEDBACK_FILE  = path.join(DATA_DIR, 'feedback.json');
 });
 if (!fs.existsSync(USERS_FILE))    fs.writeFileSync(USERS_FILE,    '[]');
 if (!fs.existsSync(SESSIONS_FILE)) fs.writeFileSync(SESSIONS_FILE, '[]');
+if (!fs.existsSync(RESETS_FILE))   fs.writeFileSync(RESETS_FILE,   '[]');
 if (!fs.existsSync(FEEDBACK_FILE)) fs.writeFileSync(FEEDBACK_FILE, '[]');
 
 /* ================================================================
@@ -395,6 +400,37 @@ function callClaude(messages, systemPrompt) {
   });
 }
 
+function sendEmail(to, subject, html) {
+  if (!RESEND_API_KEY) {
+    console.log(`[email] No RESEND_API_KEY — skipping send to ${to} | subject: ${subject}`);
+    return Promise.resolve({ dev: true });
+  }
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify({ from: EMAIL_FROM, to: [to], subject, html });
+    const options = {
+      hostname: 'api.resend.com',
+      path:     '/emails',
+      method:   'POST',
+      headers: {
+        'Authorization':  `Bearer ${RESEND_API_KEY}`,
+        'Content-Type':   'application/json',
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    };
+    const req = https.request(options, res => {
+      let raw = '';
+      res.on('data', c => raw += c);
+      res.on('end', () => {
+        try { resolve(JSON.parse(raw)); }
+        catch { reject(new Error('Could not parse Resend response')); }
+      });
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
 const VALID_MOODS = ['motivated', 'happy', 'grateful', 'tired', 'anxious', 'sad', 'overwhelmed'];
 
 /* ================================================================
@@ -510,6 +546,68 @@ const server = http.createServer(async (req, res) => {
       const header = req.headers['authorization'];
       const token  = header?.startsWith('Bearer ') ? header.slice(7) : null;
       if (token) writeJSON(SESSIONS_FILE, readJSON(SESSIONS_FILE).filter(s => s.token !== token));
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    if (method === 'POST' && url === '/api/auth/forgot-password') {
+      const { email } = await readBody(req);
+      // Always return 200 — never reveal whether an email exists
+      if (email) {
+        const user = findUserByEmail(email);
+        if (user) {
+          const resets = readJSON(RESETS_FILE).filter(r => r.userId !== user.id || r.expiresAt > Date.now());
+          const token  = generateToken();
+          resets.push({ token, userId: user.id, email: user.email, expiresAt: Date.now() + RESET_TTL });
+          writeJSON(RESETS_FILE, resets);
+
+          const resetUrl = `${APP_URL}/reset.html?token=${token}`;
+          console.log(`[forgot-password] Reset link for ${user.email}: ${resetUrl}`);
+
+          const html = `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:2rem;">
+<h2 style="color:#3a8f65;margin-bottom:0.5rem;">Reset your password</h2>
+<p style="color:#444;line-height:1.6;">You requested a password reset for your ReflectAI account. Click the button below to choose a new password.</p>
+<p style="margin:1.75rem 0;"><a href="${resetUrl}" style="background:#3a8f65;color:#fff;padding:0.75rem 1.5rem;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">Reset my password</a></p>
+<p style="color:#888;font-size:0.85rem;line-height:1.5;">This link expires in 1 hour. If you didn't request this, you can safely ignore this email — your account has not been changed.</p>
+<hr style="border:none;border-top:1px solid #eee;margin:1.5rem 0;"/>
+<p style="color:#aaa;font-size:0.78rem;">ReflectAI · Your private journaling space</p>
+</div>`;
+
+          try { await sendEmail(user.email, 'Reset your ReflectAI password', html); }
+          catch (err) { console.error('[forgot-password] email send failed:', err.message); }
+        }
+      }
+      return sendJSON(res, 200, { ok: true });
+    }
+
+    if (method === 'GET' && url.startsWith('/api/auth/validate-reset-token')) {
+      const qs    = req.url.includes('?') ? req.url.slice(req.url.indexOf('?') + 1) : '';
+      const token = new URLSearchParams(qs).get('token');
+      if (!token) return sendJSON(res, 400, { valid: false, error: 'Token is required.' });
+      const reset = readJSON(RESETS_FILE).find(r => r.token === token && r.expiresAt > Date.now());
+      if (!reset)  return sendJSON(res, 400, { valid: false, error: 'This reset link is invalid or has expired.' });
+      return sendJSON(res, 200, { valid: true, email: reset.email });
+    }
+
+    if (method === 'POST' && url === '/api/auth/reset-password') {
+      const { token, password } = await readBody(req);
+      if (!token || !password)
+        return sendJSON(res, 400, { error: 'Token and new password are required.' });
+      if (password.length < 8)
+        return sendJSON(res, 400, { error: 'Password must be at least 8 characters.' });
+
+      const resets = readJSON(RESETS_FILE);
+      const idx    = resets.findIndex(r => r.token === token && r.expiresAt > Date.now());
+      if (idx === -1) return sendJSON(res, 400, { error: 'This reset link is invalid or has expired.' });
+
+      const { userId } = resets[idx];
+      const salt = crypto.randomBytes(32).toString('hex');
+      updateUser(userId, { passwordHash: hashPassword(password, salt), salt });
+
+      // Consume the token and invalidate all sessions for this user
+      resets.splice(idx, 1);
+      writeJSON(RESETS_FILE, resets);
+      writeJSON(SESSIONS_FILE, readJSON(SESSIONS_FILE).filter(s => s.userId !== userId));
+
       return sendJSON(res, 200, { ok: true });
     }
 

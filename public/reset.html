@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reset Password – ReflectAI</title>
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    (function () {
+      var saved = localStorage.getItem('reflectai_theme');
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', saved || (prefersDark ? 'dark' : 'light'));
+    })();
+  </script>
+</head>
+<body class="reset-page">
+
+  <div class="reset-wrap">
+    <div class="auth-card">
+      <div class="auth-logo">🌿 <strong>Reflect</strong>AI</div>
+
+      <!-- Validating token -->
+      <div id="reset-loading">
+        <p class="reset-status-text">Checking your reset link…</p>
+      </div>
+
+      <!-- Invalid / expired token -->
+      <div id="reset-invalid" class="hidden">
+        <div class="auth-success-msg reset-error-msg">
+          <span class="auth-success-icon">⚠️</span>
+          <p>This reset link is invalid or has expired.</p>
+          <p class="auth-success-note">Reset links are only valid for 1 hour. Please request a new one.</p>
+        </div>
+        <a href="/" class="btn btn-primary auth-submit" style="display:block;text-align:center;text-decoration:none;margin-top:1rem;">Back to ReflectAI</a>
+      </div>
+
+      <!-- Reset form -->
+      <div id="reset-form-wrap" class="hidden">
+        <p class="auth-tagline" id="reset-email-label"></p>
+        <form id="reset-form" novalidate>
+          <div id="reset-error" class="error-msg hidden" role="alert"></div>
+          <div class="form-group" style="margin-bottom:1rem;">
+            <label for="new-password">New password</label>
+            <input type="password" id="new-password" placeholder="At least 8 characters"
+              autocomplete="new-password" required minlength="8" />
+          </div>
+          <div class="form-group" style="margin-bottom:1.25rem;">
+            <label for="confirm-password">Confirm new password</label>
+            <input type="password" id="confirm-password" placeholder="Repeat your password"
+              autocomplete="new-password" required />
+          </div>
+          <button type="submit" class="btn btn-primary auth-submit" id="reset-btn">Set new password</button>
+        </form>
+      </div>
+
+      <!-- Success -->
+      <div id="reset-success" class="hidden">
+        <div class="auth-success-msg">
+          <span class="auth-success-icon">✅</span>
+          <p>Your password has been reset successfully.</p>
+          <p class="auth-success-note">You've been logged out of all devices. Log in with your new password.</p>
+        </div>
+        <a href="/" class="btn btn-primary auth-submit" style="display:block;text-align:center;text-decoration:none;margin-top:1rem;">Log in to ReflectAI</a>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const token  = params.get('token');
+
+    async function init() {
+      if (!token) { show('reset-invalid'); return; }
+
+      try {
+        const res  = await fetch(`/api/auth/validate-reset-token?token=${encodeURIComponent(token)}`);
+        const data = await res.json();
+        if (!data.valid) { show('reset-invalid'); return; }
+        document.getElementById('reset-email-label').textContent = `Resetting password for ${data.email}`;
+        show('reset-form-wrap');
+      } catch {
+        show('reset-invalid');
+      }
+    }
+
+    function show(id) {
+      document.getElementById('reset-loading').classList.add('hidden');
+      document.getElementById(id).classList.remove('hidden');
+    }
+
+    document.getElementById('reset-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const errEl    = document.getElementById('reset-error');
+      const btn      = document.getElementById('reset-btn');
+      const password = document.getElementById('new-password').value;
+      const confirm  = document.getElementById('confirm-password').value;
+
+      errEl.classList.add('hidden');
+
+      if (password.length < 8) {
+        errEl.textContent = 'Password must be at least 8 characters.';
+        errEl.classList.remove('hidden'); return;
+      }
+      if (password !== confirm) {
+        errEl.textContent = 'Passwords do not match.';
+        errEl.classList.remove('hidden'); return;
+      }
+
+      btn.disabled = true; btn.textContent = 'Saving…';
+
+      try {
+        const res  = await fetch('/api/auth/reset-password', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not reset password.');
+        document.getElementById('reset-form-wrap').classList.add('hidden');
+        show('reset-success');
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('hidden');
+        btn.disabled = false; btn.textContent = 'Set new password';
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

@@ -160,11 +160,54 @@ function showAuthOverlay() { document.getElementById('auth-overlay').classList.r
 function hideAuthOverlay() { document.getElementById('auth-overlay').classList.add('hidden');    }
 
 function showAuthTab(tab) {
-  document.getElementById('login-form').classList.toggle('hidden',  tab !== 'login');
-  document.getElementById('signup-form').classList.toggle('hidden', tab !== 'signup');
-  document.getElementById('tab-login').classList.toggle('active',   tab === 'login');
-  document.getElementById('tab-signup').classList.toggle('active',  tab === 'signup');
+  document.getElementById('login-form').classList.toggle('hidden',    tab !== 'login');
+  document.getElementById('signup-form').classList.toggle('hidden',   tab !== 'signup');
+  document.getElementById('forgot-form')?.classList.add('hidden');
+  document.getElementById('forgot-success')?.classList.add('hidden');
+  document.getElementById('tab-login').classList.toggle('active',     tab === 'login');
+  document.getElementById('tab-signup').classList.toggle('active',    tab === 'signup');
   document.getElementById('auth-error').classList.add('hidden');
+}
+
+function showForgotPassword() {
+  document.getElementById('login-form').classList.add('hidden');
+  document.getElementById('auth-error').classList.add('hidden');
+  document.getElementById('forgot-success').classList.add('hidden');
+  // Pre-fill email from login field if already typed
+  const loginEmail = document.getElementById('login-email').value.trim();
+  if (loginEmail) document.getElementById('forgot-email').value = loginEmail;
+  document.getElementById('forgot-form').classList.remove('hidden');
+  document.getElementById('forgot-email').focus();
+}
+
+function backToLogin() {
+  document.getElementById('forgot-form').classList.add('hidden');
+  document.getElementById('forgot-success').classList.add('hidden');
+  document.getElementById('login-form').classList.remove('hidden');
+  document.getElementById('auth-error').classList.add('hidden');
+}
+
+async function handleForgotPassword(event) {
+  event.preventDefault();
+  const btn   = document.getElementById('forgot-btn');
+  const email = document.getElementById('forgot-email').value.trim();
+  if (!email) return;
+  btn.disabled = true; btn.textContent = 'Sending…';
+  document.getElementById('auth-error').classList.add('hidden');
+  try {
+    await fetch('/api/auth/forgot-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    // Always show success — never reveal whether email exists
+    document.getElementById('forgot-form').classList.add('hidden');
+    document.getElementById('forgot-success').classList.remove('hidden');
+  } catch {
+    const el = document.getElementById('auth-error');
+    el.textContent = 'Could not send reset email. Please try again.';
+    el.classList.remove('hidden');
+    btn.disabled = false; btn.textContent = 'Send reset link';
+  }
 }
 
 function setAuthError(msg) {
