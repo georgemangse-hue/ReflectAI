@@ -535,7 +535,7 @@ function sendReferralNotificationEmail(to, friendName) {
               <p style="color:#8a9e92;font-size:13px;margin:0;">added to your ReflectAI subscription</p>
             </td></tr>
           </table>
-          <p style="color:#4a5e52;font-size:14px;line-height:1.7;margin:0 0 24px;">Keep sharing your referral link to earn more — up to 12 free months per year.</p>
+          <p style="color:#4a5e52;font-size:14px;line-height:1.7;margin:0 0 24px;">Keep sharing your referral link to earn more — up to 3 free months per year.</p>
           <table cellpadding="0" cellspacing="0">
             <tr><td style="background:#3a8f65;border-radius:8px;">
               <a href="${APP_URL}/referral.html" style="display:inline-block;padding:13px 28px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;">View my referrals →</a>
@@ -582,17 +582,13 @@ async function applyReferralCredit(paidUser) {
   // Yearly cap: max 12 credits per calendar year
   const year = String(new Date().getFullYear());
   const yearlyCount = referrer.referralCreditYearlyCount?.[year] || 0;
-  if (yearlyCount >= 12) {
-    console.log(`[referral] ${referrer.email} has hit the 12-credit yearly cap`);
+  if (yearlyCount >= 3) {
+    console.log(`[referral] ${referrer.email} has hit the 3-credit yearly cap`);
     return;
   }
 
   const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
   const now         = Date.now();
-
-  // Extend referred user's subscription by a bonus 30 days (first month free)
-  const bonusExpiry = Math.max(paidUser.subscriptionExpiry || now, now) + THIRTY_DAYS;
-  updateUser(paidUser.id, { subscriptionExpiry: bonusExpiry });
 
   // Credit the referrer: extend their subscription by 30 days
   const referrerExpiry = Math.max(referrer.subscriptionExpiry || now, now) + THIRTY_DAYS;
