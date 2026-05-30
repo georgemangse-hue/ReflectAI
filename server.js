@@ -578,7 +578,7 @@ const server = http.createServer(async (req, res) => {
             <span style="font-size:22px;vertical-align:middle;">🌿</span>
             <span style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.3px;vertical-align:middle;">&nbsp;ReflectAI</span>
           </div>
-          <p style="color:#c8e6d8;font-size:13px;margin:6px 0 0;letter-spacing:0.02em;">Your private journaling space</p>
+          <p style="color:#c8e6d8;font-size:13px;margin:6px 0 0;letter-spacing:0.02em;">Learn | Grow | Succeed</p>
         </td>
       </tr>
 
