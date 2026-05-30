@@ -12,6 +12,8 @@
   },
   "devDependencies": {
     "playwright": "^1.60.0"
+  },
+  "dependencies": {
+    "nodemailer": "^8.0.10"
   }
 }
-

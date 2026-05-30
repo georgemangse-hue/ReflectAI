@@ -1,10 +1,11 @@
 'use strict';
 
-const http   = require('http');
-const https  = require('https');
-const fs     = require('fs');
-const path   = require('path');
-const crypto = require('crypto');
+const http       = require('http');
+const https      = require('https');
+const fs         = require('fs');
+const path       = require('path');
+const crypto     = require('crypto');
+const nodemailer = require('nodemailer');
 
 /* ================================================================
    .env loader
@@ -40,8 +41,9 @@ const FLUTTERWAVE_PUBLIC_KEY     = process.env.FLUTTERWAVE_PUBLIC_KEY     || '';
 const FLUTTERWAVE_SECRET_KEY     = process.env.FLUTTERWAVE_SECRET_KEY     || '';
 const APP_URL                    = process.env.APP_URL                    || `http://localhost:${PORT}`;
 const ADMIN_SECRET           = process.env.ADMIN_SECRET           || crypto.randomBytes(16).toString('hex');
-const RESEND_API_KEY         = process.env.RESEND_API_KEY         || '';
-const EMAIL_FROM             = process.env.EMAIL_FROM             || 'ReflectAI <onboarding@resend.dev>';
+const GMAIL_APP_PASSWORD     = process.env.GMAIL_APP_PASSWORD     || '';
+const SMTP_USER              = process.env.SMTP_USER              || 'georgemangse@gmail.com';
+const EMAIL_FROM_NAME        = process.env.EMAIL_FROM_NAME        || 'ReflectAI by PremierLEADZ';
 const RESET_TTL              = 24 * 60 * 60 * 1000; // 24 hours
 const FREE_ENTRY_LIMIT          = 3;
 const FREE_WEEKLY_INSIGHT_LIMIT = 1;
@@ -401,34 +403,92 @@ function callClaude(messages, systemPrompt) {
 }
 
 function sendEmail(to, subject, html) {
-  if (!RESEND_API_KEY) {
-    console.log(`[email] No RESEND_API_KEY — skipping send to ${to} | subject: ${subject}`);
+  if (!GMAIL_APP_PASSWORD) {
+    console.log(`[email] No GMAIL_APP_PASSWORD — skipping send to ${to} | subject: ${subject}`);
     return Promise.resolve({ dev: true });
   }
-  return new Promise((resolve, reject) => {
-    const payload = JSON.stringify({ from: EMAIL_FROM, to: [to], subject, html });
-    const options = {
-      hostname: 'api.resend.com',
-      path:     '/emails',
-      method:   'POST',
-      headers: {
-        'Authorization':  `Bearer ${RESEND_API_KEY}`,
-        'Content-Type':   'application/json',
-        'Content-Length': Buffer.byteLength(payload)
-      }
-    };
-    const req = https.request(options, res => {
-      let raw = '';
-      res.on('data', c => raw += c);
-      res.on('end', () => {
-        try { resolve(JSON.parse(raw)); }
-        catch { reject(new Error('Could not parse Resend response')); }
-      });
-    });
-    req.on('error', reject);
-    req.write(payload);
-    req.end();
+  const transporter = nodemailer.createTransport({
+    host:   'smtp.gmail.com',
+    port:   587,
+    secure: false, // STARTTLS
+    auth:   { user: SMTP_USER, pass: GMAIL_APP_PASSWORD }
   });
+  return transporter.sendMail({
+    from:    `"${EMAIL_FROM_NAME}" <${SMTP_USER}>`,
+    to,
+    subject,
+    html
+  });
+}
+
+function sendSubscriptionConfirmationEmail(email, expiry) {
+  const expiryStr = expiry
+    ? new Date(expiry).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+    : null;
+  const year = new Date().getFullYear();
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+<body style="margin:0;padding:0;background:#f4f7f4;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f4;padding:40px 16px;">
+  <tr><td align="center">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.08);">
+      <tr>
+        <td style="background:#3a8f65;padding:28px 40px;text-align:center;">
+          <span style="font-size:22px;vertical-align:middle;">🌿</span>
+          <span style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.3px;vertical-align:middle;">&nbsp;ReflectAI</span>
+          <p style="color:#c8e6d8;font-size:13px;margin:6px 0 0;letter-spacing:0.02em;">Learn | Grow | Succeed</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:40px 40px 32px;">
+          <h1 style="color:#1a2e24;font-size:22px;font-weight:700;margin:0 0 12px;line-height:1.3;">You're now a Pro member 🎉</h1>
+          <p style="color:#4a5e52;font-size:15px;line-height:1.7;margin:0 0 20px;">Thank you for subscribing to ReflectAI Pro. Your account has been upgraded and all Pro features are now unlocked.</p>
+          <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;width:100%;">
+            <tr><td style="background:#f4f7f4;border-radius:8px;padding:16px 20px;">
+              <p style="color:#3a8f65;font-size:13px;font-weight:700;margin:0 0 10px;text-transform:uppercase;letter-spacing:0.08em;">What's included in Pro</p>
+              <p style="color:#4a5e52;font-size:14px;line-height:1.7;margin:0;">
+                ✓ &nbsp;Unlimited journal entries<br/>
+                ✓ &nbsp;Extended coaching sessions (10 exchanges)<br/>
+                ✓ &nbsp;Unlimited weekly insights<br/>
+                ✓ &nbsp;Unlimited goals &amp; AI check-ins
+              </p>
+            </td></tr>
+          </table>
+          ${expiryStr ? `<p style="color:#8a9e92;font-size:13px;line-height:1.6;margin:0 0 24px;">Your subscription renews on <strong>${expiryStr}</strong>.</p>` : ''}
+          <table cellpadding="0" cellspacing="0">
+            <tr><td style="background:#3a8f65;border-radius:8px;">
+              <a href="${APP_URL}" style="display:inline-block;padding:13px 28px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;">Open ReflectAI →</a>
+            </td></tr>
+          </table>
+        </td>
+      </tr>
+      <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e8f0eb;margin:0;"/></td></tr>
+      <tr>
+        <td style="padding:24px 40px 32px;">
+          <p style="color:#4a5e52;font-size:13px;line-height:1.6;margin:0;">
+            Warm regards,<br/>
+            <strong>The ReflectAI Team</strong><br/>
+            <span style="color:#8a9e92;">PremierLEADZ Consulting Ltd</span>
+          </p>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#f4f7f4;padding:16px 40px;text-align:center;border-top:1px solid #e8f0eb;">
+          <p style="color:#b0bdb4;font-size:11px;margin:0;line-height:1.5;">
+            © ${year} PremierLEADZ Consulting Ltd · ReflectAI<br/>
+            This is an automated message — please do not reply to this email.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+  return sendEmail(email, 'Welcome to ReflectAI Pro 🎉', html).catch(err =>
+    console.error('[email] subscription confirmation failed:', err.message)
+  );
 }
 
 const VALID_MOODS = ['motivated', 'happy', 'grateful', 'tired', 'anxious', 'sad', 'overwhelmed'];
@@ -710,13 +770,15 @@ const server = http.createServer(async (req, res) => {
 
       if (!PAYSTACK_SECRET_KEY) {
         // Dev / test mode
+        const expiry = Date.now() + THIRTY_DAYS;
         updateUser(user.id, {
           paid: true, plan: 'pro',
           subscriptionStatus: 'active',
-          subscriptionExpiry: Date.now() + THIRTY_DAYS,
+          subscriptionExpiry: expiry,
           subscriptionCode:   'TEST_SUB_' + reference
         });
         const updated = readJSON(USERS_FILE).find(u => u.id === user.id);
+        sendSubscriptionConfirmationEmail(user.email, expiry);
         return sendJSON(res, 200, { ok: true, user: userShape(updated) });
       }
 
@@ -741,13 +803,15 @@ const server = http.createServer(async (req, res) => {
       // Extract subscription code — Paystack includes it in the transaction data for plan payments
       const subscriptionCode = result.data?.subscription_code || result.data?.plan_object?.subscription_code || null;
 
+      const paystackExpiry = Date.now() + THIRTY_DAYS;
       updateUser(user.id, {
         paid: true, plan: 'pro',
         subscriptionStatus: 'active',
-        subscriptionExpiry: Date.now() + THIRTY_DAYS,
+        subscriptionExpiry: paystackExpiry,
         subscriptionCode
       });
       const updated = readJSON(USERS_FILE).find(u => u.id === user.id);
+      sendSubscriptionConfirmationEmail(user.email, paystackExpiry);
       return sendJSON(res, 200, { ok: true, user: userShape(updated) });
     }
 
@@ -764,13 +828,15 @@ const server = http.createServer(async (req, res) => {
 
       if (!FLUTTERWAVE_SECRET_KEY) {
         // Dev / test mode
+        const flwExpiry = Date.now() + THIRTY_DAYS;
         updateUser(user.id, {
           paid: true, plan: 'pro',
           subscriptionStatus: 'active',
-          subscriptionExpiry: Date.now() + THIRTY_DAYS,
+          subscriptionExpiry: flwExpiry,
           flwTransactionId:   String(transaction_id)
         });
         const updated = readJSON(USERS_FILE).find(u => u.id === user.id);
+        sendSubscriptionConfirmationEmail(user.email, flwExpiry);
         return sendJSON(res, 200, { ok: true, user: userShape(updated) });
       }
 
@@ -801,14 +867,16 @@ const server = http.createServer(async (req, res) => {
       if ((flwResult.data?.amount || 0) < 7)
         return sendJSON(res, 400, { error: 'Payment amount is insufficient (expected $7.99).' });
 
+      const flwLiveExpiry = Date.now() + THIRTY_DAYS;
       updateUser(user.id, {
         paid: true, plan: 'pro',
         subscriptionStatus: 'active',
-        subscriptionExpiry: Date.now() + THIRTY_DAYS,
+        subscriptionExpiry: flwLiveExpiry,
         flwTransactionId:   String(transaction_id),
         flwCustomerId:      String(flwResult.data?.customer?.id || '')
       });
       const updated = readJSON(USERS_FILE).find(u => u.id === user.id);
+      sendSubscriptionConfirmationEmail(user.email, flwLiveExpiry);
       return sendJSON(res, 200, { ok: true, user: userShape(updated) });
     }
 
@@ -1061,15 +1129,17 @@ const server = http.createServer(async (req, res) => {
       if (session.metadata?.userId !== user.id && session.customer_email !== user.email)
         return sendJSON(res, 403, { error: 'Session does not belong to the current user.' });
 
-      const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+      const THIRTY_DAYS  = 30 * 24 * 60 * 60 * 1000;
+      const stripeExpiry = Date.now() + THIRTY_DAYS;
       updateUser(user.id, {
         paid: true, plan: 'pro',
         subscriptionStatus:  'active',
-        subscriptionExpiry:  Date.now() + THIRTY_DAYS,
+        subscriptionExpiry:  stripeExpiry,
         stripeCustomerId:     session.customer,
         stripeSubscriptionId: session.subscription
       });
       const updated = readJSON(USERS_FILE).find(u => u.id === user.id);
+      sendSubscriptionConfirmationEmail(user.email, stripeExpiry);
       return sendJSON(res, 200, { ok: true, user: userShape(updated) });
     }
 
