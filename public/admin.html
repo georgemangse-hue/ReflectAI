@@ -255,7 +255,7 @@
       } catch { $('fb-body').innerHTML = '<div class="no-data">Failed to load feedback.</div>'; }
     }
 
-    const NA_LABEL = '<span style="color:#8b949e;font-style:italic;font-size:0.78rem">N/A (pre-update submission)</span>';
+    const NA_LABEL = '<span style="color:#8b949e">—</span>';
 
     function payBadge(val, isMigrated) {
       if (!val) return isMigrated ? NA_LABEL : `<span class="badge b-free">—</span>`;
