@@ -50,6 +50,72 @@ const FREE_WEEKLY_INSIGHT_LIMIT = 1;
 const FREE_GOAL_LIMIT           = 1;
 const FREE_CHECKIN_LIMIT        = 1;
 
+// ----------------------------------------------------------------
+// African Cultural Context — proverbs, leader quotes, Nigerian themes
+// Used to enrich weekly insights with one randomly selected entry.
+// ----------------------------------------------------------------
+const AFRICAN_QUOTES = [
+  // African proverbs
+  { text: "Until the lion tells its own story, the hunter will always be the hero.", source: "African proverb" },
+  { text: "However long the night, the dawn will break.", source: "African proverb" },
+  { text: "When spider webs unite, they can tie up a lion.", source: "Ethiopian proverb" },
+  { text: "Knowledge is like a garden: if it is not cultivated, it cannot be harvested.", source: "African proverb" },
+  { text: "If you want to go fast, go alone. If you want to go far, go together.", source: "African proverb" },
+  { text: "The forest would be silent if no bird sang except the one that sang best.", source: "African proverb" },
+  { text: "Rain does not fall on one roof alone.", source: "Cameroonian proverb" },
+  { text: "He who learns, teaches.", source: "Ethiopian proverb" },
+  { text: "A tree is straightened while it is young.", source: "African proverb" },
+  { text: "A falling tree makes more noise than a growing forest.", source: "African proverb" },
+  { text: "The one who tells the stories rules the world.", source: "African proverb" },
+  { text: "A child who is not embraced by the village will burn it down to feel its warmth.", source: "African proverb" },
+  { text: "Wisdom does not come overnight.", source: "Somali proverb" },
+  { text: "When the music changes, so does the dance.", source: "Hausa proverb" },
+  { text: "Even the mightiest eagle comes down to earth to drink.", source: "Nigerian proverb" },
+  { text: "Be careful when a naked man offers you a shirt.", source: "Nigerian proverb" },
+  { text: "The elder who stole yam could not rebuke a child for stealing crayfish.", source: "Igbo proverb" },
+  { text: "When you follow in the path of your father, you learn to walk like him.", source: "Akan proverb" },
+  { text: "A man who uses force is afraid of reasoning.", source: "Kenyan proverb" },
+  { text: "Onye wetara oji wetara ndụ — He who brings kola brings life.", source: "Igbo proverb" },
+  { text: "The best way to eat the elephant standing in your path is to cut it up into little pieces.", source: "African proverb" },
+  { text: "Speak softly and carry a big stick; you will go far.", source: "West African proverb" },
+  { text: "No matter how long the night, the day is sure to come.", source: "Congolese proverb" },
+  { text: "The axe forgets, but the tree remembers.", source: "African proverb" },
+  { text: "Do not look where you fell, but where you slipped.", source: "African proverb" },
+  // Chinua Achebe
+  { text: "The world is like a mask dancing. If you want to see it well, you do not stand in one place.", source: "Chinua Achebe, Arrow of God" },
+  { text: "There is no story that is not true.", source: "Chinua Achebe, Things Fall Apart" },
+  { text: "When suffering knocks at your door and you say there is no seat for him, he tells you not to worry because he has brought his own stool.", source: "Chinua Achebe, Arrow of God" },
+  { text: "People create stories create people; or rather stories create people create stories.", source: "Chinua Achebe" },
+  { text: "One of the truest tests of integrity is its blunt refusal to be compromised.", source: "Chinua Achebe" },
+  { text: "A man who makes trouble for others is also making it for himself.", source: "Chinua Achebe, Things Fall Apart" },
+  { text: "When old people speak it is not because of the sweetness of words in our mouths; it is because we see something which you do not see.", source: "Chinua Achebe, Things Fall Apart" },
+  // Nelson Mandela
+  { text: "It always seems impossible until it's done.", source: "Nelson Mandela" },
+  { text: "Education is the most powerful weapon which you can use to change the world.", source: "Nelson Mandela" },
+  { text: "Do not judge me by my successes, judge me by how many times I fell down and got back up again.", source: "Nelson Mandela" },
+  { text: "I learned that courage was not the absence of fear, but the triumph over it.", source: "Nelson Mandela" },
+  { text: "A winner is a dreamer who never gives up.", source: "Nelson Mandela" },
+  { text: "The greatest glory in living lies not in never falling, but in rising every time we fall.", source: "Nelson Mandela" },
+  { text: "Overcoming poverty is not a task of charity, it is an act of justice.", source: "Nelson Mandela" },
+  // Chimamanda Ngozi Adichie
+  { text: "The single story creates stereotypes, and the problem with stereotypes is not that they are untrue, but that they are incomplete.", source: "Chimamanda Ngozi Adichie" },
+  { text: "Culture does not make people. People make culture.", source: "Chimamanda Ngozi Adichie" },
+  { text: "I am a person who tires easily of anger and finds sadness more honest.", source: "Chimamanda Ngozi Adichie, Purple Hibiscus" },
+  { text: "To accept your people and to love your people — even when they make you deeply uncomfortable — is to know yourself.", source: "Chimamanda Ngozi Adichie" },
+  { text: "The most important thing about power is what you do when you have it.", source: "Chimamanda Ngozi Adichie" },
+  { text: "Nne, sometimes life begins at the point of failure.", source: "Chimamanda Ngozi Adichie" },
+  // Wole Soyinka
+  { text: "The man dies in all who keep silent in the face of tyranny.", source: "Wole Soyinka" },
+  { text: "A tiger does not proclaim its tigritude; it pounces.", source: "Wole Soyinka" },
+  { text: "Books and all forms of writing are terror to those who wish to suppress the truth.", source: "Wole Soyinka" },
+  { text: "We must shed the habit of talking about what we know. The time has come for us to know what we talk about.", source: "Wole Soyinka" },
+  { text: "Mediocrity is the greatest threat to the growth of any nation.", source: "Wole Soyinka" },
+];
+
+function getRandomAfricanQuote() {
+  return AFRICAN_QUOTES[Math.floor(Math.random() * AFRICAN_QUOTES.length)];
+}
+
 // In-memory demo rate limiter — 5 prompts per IP per hour (resets on server restart)
 const demoRateLimit   = new Map();
 const DEMO_HOUR_LIMIT = 5;
@@ -1514,13 +1580,15 @@ const server = http.createServer(async (req, res) => {
       if (!entry || entry.trim().length < 20)
         return sendJSON(res, 400, { error: 'Please write a little more so the AI has something to reflect on.' });
 
-      const systemPrompt = `You are a warm, perceptive life coach supporting students and young professionals. Read the journal entry below and write exactly ONE reflection prompt.
+      const systemPrompt = `You are a warm, perceptive life coach supporting students and young professionals — particularly those navigating life in Nigeria and across Africa. You carry the warmth of a trusted Nigerian mentor: grounded in community values, resilient spirit, and the deep belief that every person's story matters. Read the journal entry below and write exactly ONE reflection prompt.
 
 The prompt must:
 1. Reference a specific detail, emotion, or phrase the writer actually used — never generic
 2. Use second person ("you", "your") and a warm, conversational tone
 3. Be 1–2 sentences — like a question a coach would lean in and ask
 4. Favour "what" or "how" over "why"
+
+Cultural awareness: be attuned to Nigerian and African life realities where relevant — family expectations, the weight of community honour, hustle spirit, faith as an anchor, and the quiet pride of small wins against real obstacles.
 
 Also pick the single best category from: Feelings, Mindset, Growth, Next Step, Gratitude, Perspective, Relationships, Identity
 
@@ -1545,9 +1613,9 @@ Respond with ONLY valid JSON — no markdown, no explanation:
       if (!entry || entry.trim().length < 10)
         return sendJSON(res, 400, { error: 'Entry text is too short.' });
 
-      const systemPrompt = `You are a warm, perceptive life coach who specialises in supporting students and young professionals navigating early-career life. Your tone is like a wise, older friend — curious, non-judgmental, and genuinely invested in this person's growth.
+      const systemPrompt = `You are a warm, perceptive life coach who specialises in supporting students and young professionals navigating early-career life — especially those building their futures in Nigeria and across Africa. Your tone is like a wise, older friend — curious, non-judgmental, and genuinely invested in this person's growth. You are culturally attuned to the African experience: the weight of family expectations, the hustle spirit, faith as a daily anchor, community bonds, and the particular resilience required to build a life in Nigeria.
 
-When given a journal entry, write exactly 3 reflection prompts that feel like they came from someone who truly *listened*. Each prompt should help the writer go one layer deeper — past what happened, into what it means for who they are and who they are becoming.
+When given a journal entry, write exactly 3 reflection prompts that feel like they came from someone who truly *listened*. Each prompt should help the writer go one layer deeper — past what happened, into what it means for who they are and who they are becoming. Where it genuinely fits, honour the Nigerian and African context — the communal dimension of personal choices, the complexity of family honour, the quiet dignity of persisting through difficult odds.
 
 Rules every prompt must follow:
 1. Reference at least one specific detail, emotion, person, situation, or phrase the writer actually used. A prompt that could appear in any stranger's journal has failed.
@@ -1607,7 +1675,9 @@ Available categories (pick the 3 that best fit): Feelings, Mindset, Growth, Next
         ? [...messages.slice(0, 2), ...messages.slice(-10)]
         : messages;
 
-      const systemPrompt = `You are a warm, skilled life coach having a private session with someone about their journal entry. You've already asked them a reflection prompt and they've responded. Your job: help them go deeper — one layer per turn.
+      const systemPrompt = `You are a warm, skilled life coach having a private session with someone about their journal entry — someone who likely lives and works in Nigeria or West Africa. You've already asked them a reflection prompt and they've responded. Your job: help them go deeper — one layer per turn.
+
+You are culturally intelligent and attuned to the Nigerian context: you understand the weight that family honour carries, the intersection of faith and ambition, hustle culture, the communal dimension of personal decisions, and the real pressure of building a life with limited safety nets. Honour this context — neither exoticise it nor ignore it.
 
 Core approach — Pace then Lead: first reflect back what they actually said (so they feel truly heard), then move them forward with a question that presupposes they're already capable and already in motion.
 
@@ -1648,16 +1718,18 @@ Rules:
         return sendJSON(res, 200, { insight: "You haven't written any entries yet. Start journaling daily and come back here for your first weekly insight!" });
 
       const formatted    = entries.map((e, i) => `Entry ${i + 1} — ${e.date}:\n${e.text}`).join('\n\n---\n\n');
-      const systemPrompt = `You are a warm, perceptive life coach who specialises in supporting students and young professionals. You have just read someone's journal entries from the past week. Write a personal weekly insight in 2–3 short paragraphs.
+      const weeklyQuote  = getRandomAfricanQuote();
+      const systemPrompt = `You are a warm, perceptive life coach who specialises in supporting students and young professionals — particularly those building their futures in Nigeria and across Africa. You have just read someone's journal entries from the past week. Write a personal weekly insight in 2–3 short paragraphs.
 
-Your voice is like a trusted mentor who notices things the writer hasn't consciously spotted about themselves — honest, warm, and specific.
+Your voice is like a trusted Nigerian mentor who notices things the writer hasn't consciously spotted about themselves — honest, warm, culturally grounded, and specific. You understand the African experience: family expectations, hustle spirit, faith as an anchor, community honour, and the particular resilience of building a life in Nigeria.
 
 Structure:
 1. Open by naming a concrete theme or tension that ran through the week — back it up with a specific detail or phrase from the entries.
 2. Celebrate something real: a moment of courage, resilience, self-awareness, or quiet growth. Quote or closely echo something they actually wrote.
-3. Close with one forward-looking invitation tailored to this particular person — a challenge or experiment to carry into the week ahead.
+3. Weave in this African quote or proverb naturally — let it illuminate something specific about their week, not just drop in as decoration: "${weeklyQuote.text}" — ${weeklyQuote.source}
+4. Close with one forward-looking invitation tailored to this particular person — a challenge or experiment to carry into the week ahead.
 
-Voice: second person only ("you", "your"). Flowing prose, no bullets or headers. ~150–200 words. Let encouragement come from specificity, not cheerleading. Never say "amazing" or "you're doing great".`;
+Voice: second person only ("you", "your"). Flowing prose, no bullets or headers. ~180–230 words. Let encouragement come from specificity, not cheerleading. Never say "amazing" or "you're doing great". Feel warm and culturally alive — not generic Western self-help.`;
 
       const result = await callClaude([{ role: 'user', content: `Here are my journal entries from this past week:\n\n${formatted}` }], systemPrompt);
       if (!isSubscriptionActive(user)) {
@@ -1748,9 +1820,9 @@ Voice: second person only ("you", "your"). Flowing prose, no bullets or headers.
         ? entries.map((e, i) => `Entry ${i + 1} (${e.date}):\n${e.text}`).join('\n\n---\n\n')
         : 'No recent journal entries.';
 
-      const systemPrompt = `You are a warm, encouraging life coach helping a student or young professional track progress on a personal goal. You have their goal details and recent journal entries. Write a short, personal goal check-in in 2–3 sentences.
+      const systemPrompt = `You are a warm, encouraging life coach helping a student or young professional — likely based in Nigeria or West Africa — track progress on a personal goal. You have their goal details and recent journal entries. Write a short, personal goal check-in in 2–3 sentences.
 
-Your check-in should note any specific evidence from the journal entries that relates to this goal (progress, setbacks, related thoughts, or relevant actions). If there's no direct evidence, make an empathetic observation and offer one concrete, encouraging next step. Be specific — no generic advice.`;
+Your check-in should note any specific evidence from the journal entries that relates to this goal (progress, setbacks, related thoughts, or relevant actions). Be attuned to the Nigerian context — the weight of goals that carry family honour, limited resources, and real structural obstacles. Celebrate persistence as much as results. If there's no direct evidence, make an empathetic observation and offer one concrete, encouraging next step. Be specific — no generic advice.`;
 
       const userMsg = `My goal: "${goal.title}"${goal.description ? `\nDetails: ${goal.description}` : ''}${goal.targetDate ? `\nTarget date: ${goal.targetDate}` : ''}\n\nRecent journal entries:\n\n${formatted}`;
       const result  = await callClaude([{ role: 'user', content: userMsg }], systemPrompt);
