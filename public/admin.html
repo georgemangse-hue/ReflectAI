@@ -83,6 +83,7 @@
     .fb-full { white-space: pre-wrap; }
     .hidden  { display: none !important; }
     .fb-detail td { white-space: normal; font-size: 0.82rem; line-height: 1.65; color: #c9d1d9; }
+    .legacy-note { margin-bottom: 1rem; padding: 0.6rem 1rem; background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.3); border-radius: 8px; font-size: 0.8rem; color: #d29922; }
 
     @media (max-width: 640px) {
       .topbar, .content { padding-left: 1rem; padding-right: 1rem; }
@@ -170,6 +171,7 @@
 
       <!-- ── Feedback tab ─────────────────────────────── -->
       <div class="tab-panel" id="tab-feedback">
+        <div class="legacy-note">Responses before 01 Jun 2026 were collected with the previous form and may have incomplete fields.</div>
         <div class="stats-row" style="max-width:600px">
           <div class="stat-card">
             <div class="stat-label">Responses</div>
@@ -253,16 +255,23 @@
       } catch { $('fb-body').innerHTML = '<div class="no-data">Failed to load feedback.</div>'; }
     }
 
-    function payBadge(val) {
-      if (!val) return `<span class="badge b-free">—</span>`;
+    const NA_LABEL = '<span style="color:#8b949e;font-style:italic;font-size:0.78rem">N/A (pre-update submission)</span>';
+
+    function payBadge(val, isMigrated) {
+      if (!val) return isMigrated ? NA_LABEL : `<span class="badge b-free">—</span>`;
       if (val.startsWith('Yes'))   return `<span class="badge b-active">👍 Yes</span>`;
       if (val.startsWith('Maybe')) return `<span class="badge b-cancel">🤔 Maybe</span>`;
       if (val.startsWith('No'))    return `<span class="badge b-expired">👎 No</span>`;
       return `<span class="badge b-free">—</span>`;
     }
 
-    function shortText(s, max) {
-      if (!s) return '<span style="color:#8b949e">—</span>';
+    function displayField(val, isMigrated) {
+      if (!val) return isMigrated ? NA_LABEL : '<span style="color:#8b949e">—</span>';
+      return esc(val);
+    }
+
+    function shortText(s, max, isMigrated) {
+      if (!s) return isMigrated ? NA_LABEL : '<span style="color:#8b949e">—</span>';
       const trimmed = s.slice(0, max);
       return `<span class="fb-short">${esc(trimmed)}${s.length > max ? '…' : ''}</span><span class="fb-full hidden">${esc(s)}</span>`;
     }
@@ -283,26 +292,26 @@
             <th>Q9 — Concerns</th>
           </tr></thead>
           <tbody>
-            ${list.map(f => `
+            ${list.map(f => { const m = !!f.migratedFrom; return `
               <tr style="cursor:pointer;vertical-align:top">
                 <td style="white-space:nowrap">${fmtDate(f.createdAt)}</td>
                 <td class="td-email">${f.email ? esc(f.email) : '<em style="color:#8b949e">anon</em>'}</td>
-                <td>${esc(f.q1 || '—')}</td>
-                <td>${esc(f.q2 || '—')}</td>
-                <td>${payBadge(f.q6)}</td>
-                <td style="white-space:nowrap">${esc(f.q7 || '—')}</td>
-                <td class="td-long">${shortText(f.q8, 60)}</td>
-                <td class="td-long">${shortText(f.q9, 60)}</td>
+                <td>${displayField(f.q1, m)}</td>
+                <td>${displayField(f.q2, m)}</td>
+                <td>${payBadge(f.q6, m)}</td>
+                <td style="white-space:nowrap">${displayField(f.q7, m)}</td>
+                <td class="td-long">${shortText(f.q8, 60, m)}</td>
+                <td class="td-long">${shortText(f.q9, 60, m)}</td>
               </tr>
               <tr class="fb-detail hidden">
                 <td colspan="8" style="background:var(--surface2,#f6f8fa);padding:1rem">
-                  <strong>Q3 — Barriers:</strong> ${esc(f.q3 || '—')}<br>
-                  <strong>Q4 — Stress response:</strong> ${esc(f.q4 || '—')}<br>
-                  <strong>Q5 — Motivation:</strong> ${esc(f.q5 || '—')}<br>
-                  <strong>Q8 — Feature:</strong> ${esc(f.q8 || '—')}<br>
-                  <strong>Q9 — Concerns:</strong> ${esc(f.q9 || '—')}
+                  <strong>Q3 — Barriers:</strong> ${displayField(f.q3, m)}<br>
+                  <strong>Q4 — Stress response:</strong> ${displayField(f.q4, m)}<br>
+                  <strong>Q5 — Motivation:</strong> ${displayField(f.q5, m)}<br>
+                  <strong>Q8 — Feature:</strong> ${shortText(f.q8, 9999, m)}<br>
+                  <strong>Q9 — Concerns:</strong> ${shortText(f.q9, 9999, m)}
                 </td>
-              </tr>`).join('')}
+              </tr>`; }).join('')}
           </tbody>
         </table>`;
 
