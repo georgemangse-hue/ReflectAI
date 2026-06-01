@@ -1664,24 +1664,121 @@ footer {
 }
 .btn-danger:hover { background: #a93226; }
 
-/* ── Feedback modal ──────────────────────────────────────────── */
+/* ── Feedback / Market Research modal ───────────────────────── */
 .feedback-modal-card {
-  max-width: 500px;
+  max-width: 620px;
+  max-height: 88vh;
+  overflow-y: auto;
   text-align: left;
 }
 
-.feedback-q {
-  margin-bottom: 1.2rem;
+/* Progress bar */
+.fb-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.fb-progress-bar {
+  flex: 1;
+  height: 5px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.fb-progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+.fb-progress-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
+/* Section tags */
+.fb-section-tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.65rem;
+  border-radius: 99px;
+  margin-bottom: 1rem;
+  margin-top: 0.25rem;
+}
+.fb-tag-1 { background: #dbeafe; color: #1d4ed8; }
+.fb-tag-2 { background: #fee2e2; color: #b91c1c; }
+.fb-tag-3 { background: #dcfce7; color: #15803d; }
+.fb-tag-4 { background: #f3e8ff; color: #7e22ce; }
+[data-theme="dark"] .fb-tag-1 { background: #1e3a5f; color: #93c5fd; }
+[data-theme="dark"] .fb-tag-2 { background: #4c1919; color: #fca5a5; }
+[data-theme="dark"] .fb-tag-3 { background: #14361e; color: #86efac; }
+[data-theme="dark"] .fb-tag-4 { background: #2e1a47; color: #d8b4fe; }
+
+/* Questions */
+.feedback-q {
+  margin-bottom: 1.25rem;
+}
 .feedback-q label {
   display: block;
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--text);
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.5rem;
+}
+.fb-multi-hint {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 0.8rem;
 }
 
+/* Option grids */
+.fb-opt-grid {
+  display: grid;
+  gap: 0.5rem;
+}
+.fb-grid-2 { grid-template-columns: 1fr 1fr; }
+.fb-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+@media (max-width: 480px) {
+  .fb-grid-2, .fb-grid-3 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 360px) {
+  .fb-grid-2, .fb-grid-3 { grid-template-columns: 1fr; }
+}
+
+/* Option buttons */
+.fb-opt {
+  padding: 0.55rem 0.6rem;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  line-height: 1.35;
+}
+.fb-opt:hover { border-color: var(--primary); color: var(--primary); }
+.fb-opt.selected {
+  background: #E1F5EE;
+  border-color: #1D9E75;
+  color: #0f6e4f;
+  font-weight: 600;
+}
+[data-theme="dark"] .fb-opt.selected {
+  background: #0d3326;
+  border-color: #1D9E75;
+  color: #4ade80;
+}
+
+/* Textareas */
 .feedback-ta {
   width: 100%;
   padding: 0.65rem 0.85rem;
@@ -1695,36 +1792,28 @@ footer {
   min-height: 76px;
   outline: none;
   transition: border-color var(--ease);
+  box-sizing: border-box;
 }
 .feedback-ta:focus { border-color: var(--primary); }
 
-.feedback-pay-row {
-  display: flex;
-  gap: 0.6rem;
-}
-
-.feedback-pay-btn {
-  flex: 1;
-  padding: 0.6rem 0.4rem;
-  background: var(--bg);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--ease), border-color var(--ease), color var(--ease);
-}
-.feedback-pay-btn:hover  { border-color: var(--primary); color: var(--primary); }
-.feedback-pay-btn.selected {
-  background: var(--primary-light);
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
+/* Submit button */
 .feedback-submit-btn {
   width: 100%;
   margin-top: 0.25rem;
+}
+
+/* Thank-you state */
+.fb-thankyou {
+  text-align: center;
+  padding: 2rem 1rem 1rem;
+}
+.fb-thankyou-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+.fb-thankyou p {
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--text);
+  max-width: 380px;
+  margin: 0 auto;
 }
 
 .plan-feature-list {

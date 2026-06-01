@@ -141,7 +141,8 @@ const RESETS_FILE    = path.join(DATA_DIR, 'password_resets.json');
 const REFERRALS_FILE = path.join(DATA_DIR, 'referrals.json');
 const ENTRIES_DIR    = path.join(DATA_DIR, 'entries');
 const GOALS_DIR      = path.join(DATA_DIR, 'goals');
-const FEEDBACK_FILE  = path.join(DATA_DIR, 'feedback.json');
+const FEEDBACK_FILE           = path.join(DATA_DIR, 'feedback.json');
+const FEEDBACK_RESPONSES_FILE = path.join(DATA_DIR, 'feedback_responses.json');
 
 /* ================================================================
    Bootstrap
@@ -153,7 +154,8 @@ if (!fs.existsSync(USERS_FILE))    fs.writeFileSync(USERS_FILE,    '[]');
 if (!fs.existsSync(SESSIONS_FILE)) fs.writeFileSync(SESSIONS_FILE, '[]');
 if (!fs.existsSync(RESETS_FILE))     fs.writeFileSync(RESETS_FILE,     '[]');
 if (!fs.existsSync(REFERRALS_FILE)) fs.writeFileSync(REFERRALS_FILE, '[]');
-if (!fs.existsSync(FEEDBACK_FILE)) fs.writeFileSync(FEEDBACK_FILE, '[]');
+if (!fs.existsSync(FEEDBACK_FILE))           fs.writeFileSync(FEEDBACK_FILE,           '[]');
+if (!fs.existsSync(FEEDBACK_RESPONSES_FILE)) fs.writeFileSync(FEEDBACK_RESPONSES_FILE, '[]');
 
 /* ================================================================
    JSON helpers
@@ -1448,50 +1450,50 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* ==============================================================
-       FEEDBACK
+       FEEDBACK (market research survey — q1..q9)
     ============================================================== */
     if (method === 'POST' && url === '/api/feedback') {
-      const user = requireAuth(req, res);
-      if (!user) return;
-      const { likes, improve, wouldPay } = await readBody(req);
+      const user = getSessionUser(req); // optional — anonymous users allowed
+      const body = await readBody(req);
 
-      const VALID_PAY = ['yes', 'no', 'maybe'];
-      const likesText   = (likes   || '').trim().slice(0, 2000);
-      const improveText = (improve || '').trim().slice(0, 2000);
-      const payVal      = VALID_PAY.includes(wouldPay) ? wouldPay : null;
+      const str  = (v) => (typeof v === 'string' ? v.trim().slice(0, 2000) : null) || null;
+      const entry = {
+        id:        generateId(),
+        userId:    user ? user.id    : null,
+        email:     user ? user.email : null,
+        q1:  str(body.q1),
+        q2:  str(body.q2),
+        q3:  str(body.q3),
+        q4:  str(body.q4),
+        q5:  str(body.q5),
+        q6:  str(body.q6),
+        q7:  str(body.q7),
+        q8:  str(body.q8),
+        q9:  str(body.q9),
+        createdAt: Date.now(),
+      };
 
-      if (!likesText && !improveText && !payVal)
+      const hasAnswer = ['q1','q2','q3','q4','q5','q6','q7','q8','q9'].some(k => entry[k]);
+      if (!hasAnswer)
         return sendJSON(res, 400, { error: 'Please answer at least one question.' });
 
-      const all      = readJSON(FEEDBACK_FILE);
-      const existing = all.findIndex(f => f.userId === user.id);
-      const entry    = {
-        id:        existing !== -1 ? all[existing].id : generateId(),
-        userId:    user.id,
-        email:     user.email,
-        likes:     likesText,
-        improve:   improveText,
-        wouldPay:  payVal,
-        createdAt: existing !== -1 ? all[existing].createdAt : Date.now(),
-        updatedAt: Date.now()
-      };
-      if (existing !== -1) all[existing] = entry; else all.push(entry);
-      writeJSON(FEEDBACK_FILE, all);
+      const all = readJSON(FEEDBACK_RESPONSES_FILE);
+      all.push(entry);
+      writeJSON(FEEDBACK_RESPONSES_FILE, all);
       return sendJSON(res, 200, { ok: true });
     }
 
     if (method === 'GET' && url === '/api/admin/feedback') {
       if (!requireAdmin(req, res)) return;
-      const all  = readJSON(FEEDBACK_FILE);
+      const all  = readJSON(FEEDBACK_RESPONSES_FILE);
       const list = [...all].sort((a, b) => b.createdAt - a.createdAt);
       return sendJSON(res, 200, {
         feedback: list,
         stats: {
           total: all.length,
-          yes:   all.filter(f => f.wouldPay === 'yes').length,
-          no:    all.filter(f => f.wouldPay === 'no').length,
-          maybe: all.filter(f => f.wouldPay === 'maybe').length,
-          unanswered: all.filter(f => !f.wouldPay).length
+          yes:   all.filter(f => f.q6 === 'Yes, if it helps me grow').length,
+          maybe: all.filter(f => f.q6 === 'Maybe — depends on price').length,
+          no:    all.filter(f => f.q6 === 'No — I\'d want it free').length,
         }
       });
     }

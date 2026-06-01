@@ -196,38 +196,123 @@
   <div id="feedback-modal" class="modal-overlay hidden" aria-modal="true" role="dialog" aria-label="Share feedback">
     <div class="modal-card feedback-modal-card">
       <button class="modal-close" onclick="closeFeedbackModal()" aria-label="Close">✕</button>
-      <h2>Share Your Feedback</h2>
-      <p class="modal-subtitle">Help make ReflectAI better — takes 2 minutes.</p>
+
+      <div class="fb-progress-wrap">
+        <div class="fb-progress-bar"><div class="fb-progress-fill" id="fb-progress-fill" style="width:0%"></div></div>
+        <span class="fb-progress-label" id="fb-progress-label">0 of 9 answered</span>
+      </div>
+
+      <h2>Quick Survey</h2>
+      <p class="modal-subtitle">9 questions · ~2 minutes · helps us build what you need</p>
+
+      <div id="fb-thankyou" class="fb-thankyou hidden">
+        <div class="fb-thankyou-icon">🌿</div>
+        <p>Thank you so much! Your feedback directly shapes what ReflectAI becomes. We'll build the features you asked for.</p>
+      </div>
 
       <form id="feedback-form" onsubmit="submitFeedback(event)" novalidate>
 
-        <div class="feedback-q">
-          <label for="fb-likes">1. What do you like most about ReflectAI?</label>
-          <textarea id="fb-likes" class="feedback-ta"
-            placeholder="The AI prompts, the design, how it makes me reflect…"
-            maxlength="2000" rows="3"></textarea>
-        </div>
+        <div class="fb-section-tag fb-tag-1">About you</div>
 
         <div class="feedback-q">
-          <label for="fb-improve">2. What would you improve?</label>
-          <textarea id="fb-improve" class="feedback-ta"
-            placeholder="Something you wish it did, or did differently…"
-            maxlength="2000" rows="3"></textarea>
-        </div>
-
-        <div class="feedback-q">
-          <label>3. Would you pay ₦3,000/month for this?</label>
-          <div class="feedback-pay-row">
-            <button type="button" class="feedback-pay-btn" data-val="yes"   onclick="selectPayOpt('yes')">👍 Yes</button>
-            <button type="button" class="feedback-pay-btn" data-val="maybe" onclick="selectPayOpt('maybe')">🤔 Maybe</button>
-            <button type="button" class="feedback-pay-btn" data-val="no"    onclick="selectPayOpt('no')">👎 No</button>
+          <label>1. Which best describes you?</label>
+          <div class="fb-opt-grid fb-grid-2">
+            <button type="button" class="fb-opt" data-q="q1" data-val="Student"                    onclick="selectSingle(this)">Student</button>
+            <button type="button" class="fb-opt" data-q="q1" data-val="Young professional (20s–30s)" onclick="selectSingle(this)">Young professional (20s–30s)</button>
+            <button type="button" class="fb-opt" data-q="q1" data-val="Coach / therapist"           onclick="selectSingle(this)">Coach / therapist</button>
+            <button type="button" class="fb-opt" data-q="q1" data-val="Academic / lecturer"         onclick="selectSingle(this)">Academic / lecturer</button>
+            <button type="button" class="fb-opt" data-q="q1" data-val="Entrepreneur"                onclick="selectSingle(this)">Entrepreneur</button>
+            <button type="button" class="fb-opt" data-q="q1" data-val="Other"                       onclick="selectSingle(this)">Other</button>
           </div>
+        </div>
+
+        <div class="feedback-q">
+          <label>2. Do you currently keep a journal of any kind?</label>
+          <div class="fb-opt-grid fb-grid-3">
+            <button type="button" class="fb-opt" data-q="q2" data-val="Yes, regularly"  onclick="selectSingle(this)">Yes, regularly</button>
+            <button type="button" class="fb-opt" data-q="q2" data-val="Sometimes"       onclick="selectSingle(this)">Sometimes</button>
+            <button type="button" class="fb-opt" data-q="q2" data-val="No, never tried" onclick="selectSingle(this)">No, never tried</button>
+          </div>
+        </div>
+
+        <div class="fb-section-tag fb-tag-2">The problem</div>
+
+        <div class="feedback-q">
+          <label>3. What stops you from journaling consistently? <span class="fb-multi-hint">(select all that apply)</span></label>
+          <div class="fb-opt-grid fb-grid-2">
+            <button type="button" class="fb-opt fb-multi" data-q="q3" data-val="Don't know what to write"  onclick="toggleMulti(this)">Don't know what to write</button>
+            <button type="button" class="fb-opt fb-multi" data-q="q3" data-val="No time"                   onclick="toggleMulti(this)">No time</button>
+            <button type="button" class="fb-opt fb-multi" data-q="q3" data-val="Forget to do it"           onclick="toggleMulti(this)">Forget to do it</button>
+            <button type="button" class="fb-opt fb-multi" data-q="q3" data-val="Paper feels old-fashioned" onclick="toggleMulti(this)">Paper feels old-fashioned</button>
+            <button type="button" class="fb-opt fb-multi" data-q="q3" data-val="Privacy concerns"          onclick="toggleMulti(this)">Privacy concerns</button>
+            <button type="button" class="fb-opt fb-multi" data-q="q3" data-val="Nothing — I journal fine"  onclick="toggleMulti(this)">Nothing — I journal fine</button>
+          </div>
+        </div>
+
+        <div class="feedback-q">
+          <label>4. When you're stressed or overwhelmed, what do you usually do?</label>
+          <div class="fb-opt-grid fb-grid-2">
+            <button type="button" class="fb-opt" data-q="q4" data-val="Talk to someone"       onclick="selectSingle(this)">Talk to someone</button>
+            <button type="button" class="fb-opt" data-q="q4" data-val="Scroll social media"   onclick="selectSingle(this)">Scroll social media</button>
+            <button type="button" class="fb-opt" data-q="q4" data-val="Write it down"         onclick="selectSingle(this)">Write it down</button>
+            <button type="button" class="fb-opt" data-q="q4" data-val="Pray / meditate"       onclick="selectSingle(this)">Pray / meditate</button>
+            <button type="button" class="fb-opt" data-q="q4" data-val="Nothing — I bottle it up" onclick="selectSingle(this)">Nothing — I bottle it up</button>
+            <button type="button" class="fb-opt" data-q="q4" data-val="Exercise"              onclick="selectSingle(this)">Exercise</button>
+          </div>
+        </div>
+
+        <div class="fb-section-tag fb-tag-3">The solution</div>
+
+        <div class="feedback-q">
+          <label>5. Which would most motivate you to journal daily?</label>
+          <div class="fb-opt-grid fb-grid-2">
+            <button type="button" class="fb-opt" data-q="q5" data-val="AI prompts that respond to what I write" onclick="selectSingle(this)">AI prompts that respond to what I write</button>
+            <button type="button" class="fb-opt" data-q="q5" data-val="Weekly insights on my patterns"          onclick="selectSingle(this)">Weekly insights on my patterns</button>
+            <button type="button" class="fb-opt" data-q="q5" data-val="Goal tracking tied to my entries"        onclick="selectSingle(this)">Goal tracking tied to my entries</button>
+            <button type="button" class="fb-opt" data-q="q5" data-val="Mood tracking over time"                 onclick="selectSingle(this)">Mood tracking over time</button>
+            <button type="button" class="fb-opt" data-q="q5" data-val="Reminders and streaks"                   onclick="selectSingle(this)">Reminders and streaks</button>
+            <button type="button" class="fb-opt" data-q="q5" data-val="Complete privacy — no cloud"             onclick="selectSingle(this)">Complete privacy — no cloud</button>
+          </div>
+        </div>
+
+        <div class="feedback-q">
+          <label>6. Would you pay for an AI-powered journaling app?</label>
+          <div class="fb-opt-grid fb-grid-3">
+            <button type="button" class="fb-opt" data-q="q6" data-val="Yes, if it helps me grow"  onclick="selectSingle(this)">Yes, if it helps me grow</button>
+            <button type="button" class="fb-opt" data-q="q6" data-val="Maybe — depends on price"  onclick="selectSingle(this)">Maybe — depends on price</button>
+            <button type="button" class="fb-opt" data-q="q6" data-val="No — I'd want it free"     onclick="selectSingle(this)">No — I'd want it free</button>
+          </div>
+        </div>
+
+        <div class="feedback-q">
+          <label>7. What's a fair monthly price for a tool like this?</label>
+          <div class="fb-opt-grid fb-grid-2">
+            <button type="button" class="fb-opt" data-q="q7" data-val="Free only"                onclick="selectSingle(this)">Free only</button>
+            <button type="button" class="fb-opt" data-q="q7" data-val="₦500–₦1,000"              onclick="selectSingle(this)">₦500–₦1,000</button>
+            <button type="button" class="fb-opt" data-q="q7" data-val="₦1,000–₦3,000"            onclick="selectSingle(this)">₦1,000–₦3,000</button>
+            <button type="button" class="fb-opt" data-q="q7" data-val="₦3,000–₦5,000"            onclick="selectSingle(this)">₦3,000–₦5,000</button>
+            <button type="button" class="fb-opt" data-q="q7" data-val="$5–$10 (international)"   onclick="selectSingle(this)">$5–$10 (international)</button>
+            <button type="button" class="fb-opt" data-q="q7" data-val="$10+ if it's truly useful" onclick="selectSingle(this)">$10+ if it's truly useful</button>
+          </div>
+        </div>
+
+        <div class="fb-section-tag fb-tag-4">Open feedback</div>
+
+        <div class="feedback-q">
+          <label for="fb-q8">8. What one feature would make you use ReflectAI every single day?</label>
+          <textarea id="fb-q8" class="feedback-ta" maxlength="2000" rows="3" oninput="updateProgress()"></textarea>
+        </div>
+
+        <div class="feedback-q">
+          <label for="fb-q9">9. Any concerns about using an AI journaling app?</label>
+          <textarea id="fb-q9" class="feedback-ta" maxlength="2000" rows="3"
+            placeholder="Privacy, cost, trust, anything…" oninput="updateProgress()"></textarea>
         </div>
 
         <div id="feedback-error" class="error-msg hidden" role="alert"></div>
 
         <button type="submit" class="btn btn-primary feedback-submit-btn" id="feedback-submit-btn">
-          Send Feedback →
+          Submit Survey →
         </button>
       </form>
     </div>

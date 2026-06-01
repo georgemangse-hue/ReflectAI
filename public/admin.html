@@ -81,6 +81,8 @@
     .no-data { padding: 3rem; text-align: center; color: #8b949e; font-size: 0.88rem; }
     .td-long { max-width: 260px; white-space: normal; line-height: 1.45; font-size: 0.8rem; }
     .fb-full { white-space: pre-wrap; }
+    .hidden  { display: none !important; }
+    .fb-detail td { white-space: normal; font-size: 0.82rem; line-height: 1.65; color: #c9d1d9; }
 
     @media (max-width: 640px) {
       .topbar, .content { padding-left: 1rem; padding-right: 1rem; }
@@ -178,11 +180,11 @@
             <div class="stat-val c-green" id="fb-yes">—</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Maybe</div>
+            <div class="stat-label">Would Pay — Maybe</div>
             <div class="stat-val c-yellow" id="fb-maybe">—</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">No</div>
+            <div class="stat-label">Would Pay — No</div>
             <div class="stat-val c-red" id="fb-no">—</div>
           </div>
         </div>
@@ -252,10 +254,17 @@
     }
 
     function payBadge(val) {
-      if (val === 'yes')   return `<span class="badge b-active">👍 Yes</span>`;
-      if (val === 'maybe') return `<span class="badge b-cancel">🤔 Maybe</span>`;
-      if (val === 'no')    return `<span class="badge b-expired">👎 No</span>`;
+      if (!val) return `<span class="badge b-free">—</span>`;
+      if (val.startsWith('Yes'))   return `<span class="badge b-active">👍 Yes</span>`;
+      if (val.startsWith('Maybe')) return `<span class="badge b-cancel">🤔 Maybe</span>`;
+      if (val.startsWith('No'))    return `<span class="badge b-expired">👎 No</span>`;
       return `<span class="badge b-free">—</span>`;
+    }
+
+    function shortText(s, max) {
+      if (!s) return '<span style="color:#8b949e">—</span>';
+      const trimmed = s.slice(0, max);
+      return `<span class="fb-short">${esc(trimmed)}${s.length > max ? '…' : ''}</span><span class="fb-full hidden">${esc(s)}</span>`;
     }
 
     function renderFeedback(list) {
@@ -264,29 +273,48 @@
       $('fb-body').innerHTML = `
         <table>
           <thead><tr>
-            <th>Email</th>
-            <th>Likes</th>
-            <th>Would Improve</th>
-            <th>Would Pay?</th>
             <th>Date</th>
+            <th>Respondent</th>
+            <th>Q1 — Role</th>
+            <th>Q2 — Journals?</th>
+            <th>Q6 — Would Pay?</th>
+            <th>Q7 — Price</th>
+            <th>Q8 — Key Feature</th>
+            <th>Q9 — Concerns</th>
           </tr></thead>
           <tbody>
             ${list.map(f => `
-              <tr style="cursor:pointer;vertical-align:top" onclick="this.classList.toggle('fb-open')">
-                <td class="td-email">${esc(f.email)}</td>
-                <td class="td-long">${f.likes   ? `<span class="fb-short">${esc(f.likes.slice(0,60))}${f.likes.length > 60 ? '…' : ''}</span><span class="fb-full" style="display:none">${esc(f.likes)}</span>` : '<span style="color:#8b949e">—</span>'}</td>
-                <td class="td-long">${f.improve ? `<span class="fb-short">${esc(f.improve.slice(0,60))}${f.improve.length > 60 ? '…' : ''}</span><span class="fb-full" style="display:none">${esc(f.improve)}</span>` : '<span style="color:#8b949e">—</span>'}</td>
-                <td>${payBadge(f.wouldPay)}</td>
-                <td>${fmtDate(f.createdAt)}</td>
+              <tr style="cursor:pointer;vertical-align:top">
+                <td style="white-space:nowrap">${fmtDate(f.createdAt)}</td>
+                <td class="td-email">${f.email ? esc(f.email) : '<em style="color:#8b949e">anon</em>'}</td>
+                <td>${esc(f.q1 || '—')}</td>
+                <td>${esc(f.q2 || '—')}</td>
+                <td>${payBadge(f.q6)}</td>
+                <td style="white-space:nowrap">${esc(f.q7 || '—')}</td>
+                <td class="td-long">${shortText(f.q8, 60)}</td>
+                <td class="td-long">${shortText(f.q9, 60)}</td>
+              </tr>
+              <tr class="fb-detail hidden">
+                <td colspan="8" style="background:var(--surface2,#f6f8fa);padding:1rem">
+                  <strong>Q3 — Barriers:</strong> ${esc(f.q3 || '—')}<br>
+                  <strong>Q4 — Stress response:</strong> ${esc(f.q4 || '—')}<br>
+                  <strong>Q5 — Motivation:</strong> ${esc(f.q5 || '—')}<br>
+                  <strong>Q8 — Feature:</strong> ${esc(f.q8 || '—')}<br>
+                  <strong>Q9 — Concerns:</strong> ${esc(f.q9 || '—')}
+                </td>
               </tr>`).join('')}
           </tbody>
         </table>`;
 
-      // Toggle full text on row click
-      $('fb-body').querySelectorAll('tbody tr').forEach(row => {
+      $('fb-body').querySelectorAll('tbody tr.fb-main, tbody tr:not(.fb-detail)').forEach((row, i) => {
+        if (row.classList.contains('fb-detail')) return;
         row.addEventListener('click', () => {
-          row.querySelectorAll('.fb-short').forEach(el => el.style.display = row.classList.contains('fb-open') ? 'none' : '');
-          row.querySelectorAll('.fb-full').forEach(el  => el.style.display = row.classList.contains('fb-open') ? ''     : 'none');
+          const detail = row.nextElementSibling;
+          if (detail && detail.classList.contains('fb-detail')) {
+            detail.classList.toggle('hidden');
+            row.querySelectorAll('.fb-short').forEach(el => el.classList.toggle('hidden', !detail.classList.contains('hidden')));
+            row.querySelectorAll('.fb-full').forEach(el  => el.classList.toggle('hidden',  detail.classList.contains('hidden')));
+          }
         });
       });
     }

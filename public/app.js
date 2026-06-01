@@ -1863,44 +1863,113 @@ function escapeHTML(str) {
 /* ================================================================
    23. FEEDBACK
 ================================================================ */
-let _selectedPayOpt = null;
+const _fbAnswers = {};
 
 function showFeedbackModal() { document.getElementById('feedback-modal')?.classList.remove('hidden'); }
-function closeFeedbackModal() { document.getElementById('feedback-modal')?.classList.add('hidden'); }
+function closeFeedbackModal() {
+  document.getElementById('feedback-modal')?.classList.add('hidden');
+  _resetFeedbackModal();
+}
 
-function selectPayOpt(val) {
-  _selectedPayOpt = val;
-  document.querySelectorAll('.feedback-pay-btn').forEach(b => b.classList.toggle('selected', b.dataset.val === val));
+function selectSingle(btn) {
+  const q = btn.dataset.q;
+  document.querySelectorAll(`.fb-opt[data-q="${q}"]`).forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  _fbAnswers[q] = btn.dataset.val;
+  updateProgress();
+}
+
+function toggleMulti(btn) {
+  const q = btn.dataset.q;
+  btn.classList.toggle('selected');
+  if (!(_fbAnswers[q] instanceof Set)) _fbAnswers[q] = new Set();
+  if (btn.classList.contains('selected')) _fbAnswers[q].add(btn.dataset.val);
+  else {
+    _fbAnswers[q].delete(btn.dataset.val);
+    if (_fbAnswers[q].size === 0) delete _fbAnswers[q];
+  }
+  updateProgress();
+}
+
+function updateProgress() {
+  let answered = 0;
+  for (let i = 1; i <= 7; i++) {
+    const v = _fbAnswers['q' + i];
+    if (i === 3) { if (v instanceof Set && v.size > 0) answered++; }
+    else if (v) answered++;
+  }
+  if ((document.getElementById('fb-q8')?.value || '').trim()) answered++;
+  if ((document.getElementById('fb-q9')?.value || '').trim()) answered++;
+  const pct = Math.round((answered / 9) * 100);
+  const fill  = document.getElementById('fb-progress-fill');
+  const label = document.getElementById('fb-progress-label');
+  if (fill)  fill.style.width = pct + '%';
+  if (label) label.textContent = answered + ' of 9 answered';
+}
+
+function _resetFeedbackModal() {
+  Object.keys(_fbAnswers).forEach(k => delete _fbAnswers[k]);
+  document.querySelectorAll('.fb-opt').forEach(b => b.classList.remove('selected'));
+  const q8 = document.getElementById('fb-q8'); if (q8) q8.value = '';
+  const q9 = document.getElementById('fb-q9'); if (q9) q9.value = '';
+  const form = document.getElementById('feedback-form');
+  const ty   = document.getElementById('fb-thankyou');
+  const err  = document.getElementById('feedback-error');
+  if (form) form.classList.remove('hidden');
+  if (ty)   ty.classList.add('hidden');
+  if (err)  { err.classList.add('hidden'); err.textContent = ''; }
+  const btn = document.getElementById('feedback-submit-btn');
+  if (btn)  { btn.disabled = false; btn.textContent = 'Submit Survey →'; }
+  updateProgress();
 }
 
 async function submitFeedback(event) {
   event.preventDefault();
-  const likes   = document.getElementById('fb-likes').value.trim();
-  const improve = document.getElementById('fb-improve').value.trim();
-  const errEl   = document.getElementById('feedback-error');
-  const btn     = document.getElementById('feedback-submit-btn');
-
+  const errEl = document.getElementById('feedback-error');
+  const btn   = document.getElementById('feedback-submit-btn');
   errEl.classList.add('hidden');
-  if (!likes && !improve && !_selectedPayOpt) {
+
+  let answered = 0;
+  for (let i = 1; i <= 7; i++) {
+    const v = _fbAnswers['q' + i];
+    if (i === 3) { if (v instanceof Set && v.size > 0) answered++; }
+    else if (v) answered++;
+  }
+  if ((document.getElementById('fb-q8')?.value || '').trim()) answered++;
+  if ((document.getElementById('fb-q9')?.value || '').trim()) answered++;
+
+  if (answered < 1) {
     errEl.textContent = 'Please answer at least one question before submitting.';
     errEl.classList.remove('hidden');
     return;
   }
 
-  btn.disabled = true; btn.textContent = 'Sending…';
+  const payload = {
+    q1: _fbAnswers.q1 || null,
+    q2: _fbAnswers.q2 || null,
+    q3: (_fbAnswers.q3 instanceof Set && _fbAnswers.q3.size > 0) ? [..._fbAnswers.q3].join(', ') : null,
+    q4: _fbAnswers.q4 || null,
+    q5: _fbAnswers.q5 || null,
+    q6: _fbAnswers.q6 || null,
+    q7: _fbAnswers.q7 || null,
+    q8: (document.getElementById('fb-q8')?.value || '').trim() || null,
+    q9: (document.getElementById('fb-q9')?.value || '').trim() || null,
+  };
+
+  btn.disabled = true; btn.textContent = 'Saving…';
   try {
-    await api('POST', '/api/feedback', { likes, improve, wouldPay: _selectedPayOpt });
-    closeFeedbackModal();
-    showToast('Thanks for your feedback! 🙏');
-    document.getElementById('fb-likes').value = '';
-    document.getElementById('fb-improve').value = '';
-    _selectedPayOpt = null;
-    document.querySelectorAll('.feedback-pay-btn').forEach(b => b.classList.remove('selected'));
-  } catch (err) {
-    errEl.textContent = 'Could not send feedback: ' + err.message;
+    const token = localStorage.getItem('reflectai_token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    const res  = await fetch('/api/feedback', { method: 'POST', headers, body: JSON.stringify(payload) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Save failed');
+    document.getElementById('feedback-form').classList.add('hidden');
+    document.getElementById('fb-thankyou').classList.remove('hidden');
+  } catch {
+    errEl.textContent = 'Something went wrong. Please try again.';
     errEl.classList.remove('hidden');
-  } finally {
-    btn.disabled = false; btn.textContent = 'Send Feedback →';
+    btn.disabled = false; btn.textContent = 'Submit Survey →';
   }
 }
 
