@@ -157,6 +157,40 @@ if (!fs.existsSync(REFERRALS_FILE)) fs.writeFileSync(REFERRALS_FILE, '[]');
 if (!fs.existsSync(FEEDBACK_FILE))           fs.writeFileSync(FEEDBACK_FILE,           '[]');
 if (!fs.existsSync(FEEDBACK_RESPONSES_FILE)) fs.writeFileSync(FEEDBACK_RESPONSES_FILE, '[]');
 
+// One-time migration: copy old feedback.json records into feedback_responses.json
+(function migrateOldFeedback() {
+  const PAY_MAP = {
+    yes:   'Yes, if it helps me grow',
+    maybe: 'Maybe — depends on price',
+    no:    "No — I'd want it free",
+  };
+  const old  = readJSON(FEEDBACK_FILE);
+  if (!old.length) return;
+  const dest = readJSON(FEEDBACK_RESPONSES_FILE);
+  const existingIds = new Set(dest.map(r => r.id));
+  let migrated = 0;
+  for (const f of old) {
+    if (existingIds.has(f.id)) continue; // already migrated
+    dest.push({
+      id:        f.id,
+      userId:    f.userId  || null,
+      email:     f.email   || null,
+      q1: null, q2: null, q3: null, q4: null, q5: null,
+      q6: PAY_MAP[f.wouldPay] || null,
+      q7: null,
+      q8: (f.likes   || '').trim() || null,
+      q9: (f.improve || '').trim() || null,
+      createdAt: f.createdAt || Date.now(),
+      migratedFrom: 'feedback.json',
+    });
+    migrated++;
+  }
+  if (migrated > 0) {
+    writeJSON(FEEDBACK_RESPONSES_FILE, dest);
+    console.log(`  ✔  Migrated ${migrated} old feedback record(s) into feedback_responses.json`);
+  }
+}());
+
 /* ================================================================
    JSON helpers
 ================================================================ */
