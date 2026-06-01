@@ -28,7 +28,7 @@
   <div class="referral-hero">
     <div class="referral-hero-icon">🎁</div>
     <h1 class="referral-hero-title">Invite a Friend, Earn a Free Month</h1>
-    <p class="referral-hero-sub">Share your unique link. When a friend subscribes, you both get one month free — automatically.</p>
+    <p class="referral-hero-sub">Share your unique link. Each time a friend subscribes, you earn one free month — up to 3 free months per year.</p>
   </div>
 
   <!-- Loading / Error -->
@@ -45,7 +45,7 @@
     <!-- Your link -->
     <div class="referral-card">
       <h2 class="referral-card-title">Your Referral Link</h2>
-      <p class="referral-card-sub">Anyone who signs up using this link gets their first month free. You earn one free month when they subscribe.</p>
+      <p class="referral-card-sub">Share this link with friends. Each time one of them subscribes, you earn one free month — up to 3 free months per year.</p>
       <div class="referral-link-row">
         <input type="text" id="referral-link-input" class="referral-link-input" readonly />
         <button class="btn btn-primary referral-copy-btn" id="referral-copy-btn" onclick="copyReferralLink()">Copy link</button>
@@ -130,8 +130,8 @@
       document.getElementById('stat-converted').textContent = data.stats.totalConverted;
       document.getElementById('stat-credits').textContent   = data.stats.creditsEarned;
 
-      const waMsg = `I've been using ReflectAI for AI-powered journaling and personal development. Use my link for one free month: ${data.link}`;
-      const txMsg = `Growing daily with ReflectAI — Nigeria's first AI journaling app. Get your first month free: ${data.link}`;
+      const waMsg = `I've been using ReflectAI for AI-powered journaling and personal growth — it's been a game changer. Come join me: ${data.link}`;
+      const txMsg = `Growing daily with ReflectAI — Nigeria's first AI journaling app. Join me here: ${data.link}`;
 
       document.getElementById('msg-whatsapp').textContent = waMsg;
       document.getElementById('msg-twitter').textContent  = txMsg;
