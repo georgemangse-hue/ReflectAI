@@ -162,7 +162,7 @@
         <li><span class="feat-check">📊</span> Weekly AI insight summaries</li>
         <li><span class="feat-check">🎯</span> Goal setting &amp; tracking</li>
         <li><span class="feat-check">🤖</span> AI goal check-ins from your journal</li>
-        <li><span class="feat-check">📤</span> Journal export <em>(coming soon)</em></li>
+        <li><span class="feat-check">📤</span> Journal export (PDF)</li>
       </ul>
 
       <button class="btn btn-primary upgrade-cta" id="upgrade-btn" onclick="handleUpgrade()">
@@ -364,6 +364,7 @@
                 <a class="dropdown-btn" href="/referral.html" id="dropdown-referral-btn">🎁 Invite a friend</a>
                 <button class="dropdown-btn dropdown-btn-danger hidden" id="dropdown-cancel-btn" onclick="cancelSubscription()">Cancel Subscription</button>
                 <button class="dropdown-btn hidden" id="dropdown-resub-btn" onclick="openPaystack();closeAccountDropdown()">↩ Resubscribe</button>
+                <button class="dropdown-btn" id="dropdown-export-btn" onclick="exportJournal();closeAccountDropdown()">📤 Export Journal (PDF)</button>
                 <button class="dropdown-btn" onclick="showFeedbackModal();closeAccountDropdown()">💬 Share Feedback</button>
                 <button class="dropdown-btn dropdown-btn-logout" onclick="handleLogout()">Log out</button>
               </div>

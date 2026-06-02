@@ -320,6 +320,61 @@ function applyProGates(isPro) {
   const weeklyNote = document.getElementById('weekly-trial-note');
   if (weeklyNote) weeklyNote.classList.toggle('hidden', isPro);
   updateGoalsTrialNote();
+
+  // Export button: locked for free users
+  const exportBtn = document.getElementById('dropdown-export-btn');
+  if (exportBtn) {
+    if (isPro) {
+      exportBtn.classList.remove('dropdown-btn-locked');
+      exportBtn.removeAttribute('title');
+    } else {
+      exportBtn.classList.add('dropdown-btn-locked');
+      exportBtn.title = 'Pro feature — upgrade to export your journal';
+    }
+  }
+}
+
+async function exportJournal() {
+  if (!state.user || state.userPlan !== 'pro') {
+    showToast('Upgrade to Pro to export your journal');
+    showPaymentWall();
+    return;
+  }
+
+  const btn = document.getElementById('dropdown-export-btn');
+  const originalText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Exporting…'; }
+
+  try {
+    const token = localStorage.getItem('reflectai_token');
+    const res = await fetch('/api/export/pdf', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      showToast(data.error || 'Export failed. Please try again.');
+      return;
+    }
+
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const dateStr  = new Date().toISOString().slice(0, 10);
+    const username = (state.user?.email || 'journal').split('@')[0].replace(/[^a-zA-Z0-9_-]/g, '_');
+    a.href     = url;
+    a.download = `ReflectAI-Journal-${username}-${dateStr}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Journal exported successfully!');
+  } catch {
+    showToast('Export failed. Please try again.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = originalText; }
+  }
 }
 
 async function initAuth() {

@@ -2644,6 +2644,13 @@ footer {
 .dropdown-btn-logout {
   color: var(--text-muted);
 }
+.dropdown-btn-locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.dropdown-btn-locked:hover {
+  background: none;
+}
 /* On mobile, anchor dropdown to viewport width */
 @media (max-width: 639px) {
   .account-dropdown {

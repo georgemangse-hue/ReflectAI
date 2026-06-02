@@ -14,6 +14,7 @@
     "playwright": "^1.60.0"
   },
   "dependencies": {
-    "nodemailer": "^8.0.10"
+    "nodemailer": "^8.0.10",
+    "pdfkit": "^0.18.0"
   }
 }
