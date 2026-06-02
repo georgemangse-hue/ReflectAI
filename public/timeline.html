@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The ReflectAI Journey</title>
+  <meta name="description" content="From a single conversation about an idea, to a live product. The story of building ReflectAI." />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#3a8f65" />
+  <script>
+    (function () {
+      var saved = localStorage.getItem('reflectai_theme');
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', saved || (prefersDark ? 'dark' : 'light'));
+    })();
+  </script>
+  <style>
+    /* ── Design tokens (mirrors style.css) ── */
+    :root {
+      --bg:            #f4fbf7;
+      --surface:       #ffffff;
+      --surface-2:     #f0f9f4;
+      --primary:       #3a8f65;
+      --primary-dark:  #2a6b4a;
+      --primary-light: #e8f5ef;
+      --accent:        #8dc4a8;
+      --text:          #1b3028;
+      --text-muted:    #587568;
+      --border:        #cde5d8;
+      --shadow:        0 4px 18px rgba(30,90,60,.09), 0 2px 6px rgba(30,90,60,.05);
+      --shadow-lg:     0 12px 36px rgba(30,90,60,.14), 0 4px 12px rgba(30,90,60,.07);
+      --radius:        16px;
+      --ease:          0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    [data-theme="dark"] {
+      --bg:            #0e1e17;
+      --surface:       #162a1f;
+      --surface-2:     #1c3328;
+      --primary:       #4caf80;
+      --primary-dark:  #3a8f65;
+      --primary-light: #1e3d2d;
+      --accent:        #5a9e78;
+      --text:          #d8ede3;
+      --text-muted:    #7aaa8e;
+      --border:        #2a4a36;
+      --shadow:        0 4px 18px rgba(0,0,0,.3), 0 2px 6px rgba(0,0,0,.2);
+      --shadow-lg:     0 12px 36px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.25);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Nav ── */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 62px;
+      box-shadow: var(--shadow);
+    }
+    .nav-logo {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--primary);
+      text-decoration: none;
+    }
+    .nav-back {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      transition: background var(--ease), color var(--ease);
+    }
+    .nav-back:hover { background: var(--primary-light); color: var(--primary); }
+
+    /* ── Hero ── */
+    .hero {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 64px 24px 40px;
+      text-align: center;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--primary-light);
+      color: var(--primary);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 6px 16px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+    .hero h1 span { color: var(--primary); }
+    .hero p {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      max-width: 540px;
+      margin: 0 auto 12px;
+    }
+    .hero-meta {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+
+    /* ── Timeline container ── */
+    .timeline-wrap {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 20px 24px 80px;
+      position: relative;
+    }
+
+    /* Vertical line */
+    .timeline-wrap::before {
+      content: '';
+      position: absolute;
+      left: 52px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(to bottom, var(--primary-light) 0%, var(--primary) 15%, var(--primary) 85%, var(--primary-light) 100%);
+      border-radius: 2px;
+    }
+
+    /* ── Individual entry ── */
+    .tl-entry {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 40px;
+      position: relative;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .tl-entry.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Icon node */
+    .tl-node {
+      flex-shrink: 0;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 2px solid var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      position: relative;
+      z-index: 2;
+      box-shadow: var(--shadow);
+      transition: transform var(--ease);
+    }
+    .tl-entry:hover .tl-node { transform: scale(1.1); }
+    .tl-node.highlight {
+      background: var(--primary);
+      border-color: var(--primary-dark);
+    }
+    .tl-node.current {
+      background: var(--primary);
+      border-color: var(--primary-dark);
+      box-shadow: 0 0 0 6px var(--primary-light), var(--shadow);
+      animation: pulse 2s ease infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 6px var(--primary-light), var(--shadow); }
+      50%       { box-shadow: 0 0 0 10px var(--primary-light), var(--shadow); }
+    }
+
+    /* Card */
+    .tl-card {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      box-shadow: var(--shadow);
+      transition: box-shadow var(--ease), transform var(--ease);
+    }
+    .tl-entry:hover .tl-card {
+      box-shadow: var(--shadow-lg);
+      transform: translateY(-2px);
+    }
+    .tl-card.highlight {
+      border-color: var(--primary);
+      background: var(--surface-2);
+    }
+    .tl-card.current {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .tl-date {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .tl-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .tl-desc {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Tags */
+    .tl-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 12px;
+    }
+    .tl-tag {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 100px;
+      background: var(--primary-light);
+      color: var(--primary);
+      border: 1px solid var(--border);
+    }
+
+    /* ── Stats bar ── */
+    .stats-bar {
+      max-width: 760px;
+      margin: 0 auto 48px;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 16px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 16px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    .stat-number {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--primary);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* ── Quote callout ── */
+    .quote-block {
+      max-width: 760px;
+      margin: 0 auto 48px;
+      padding: 0 24px;
+    }
+    .quote-inner {
+      background: var(--surface-2);
+      border-left: 4px solid var(--primary);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 20px 24px;
+    }
+    .quote-text {
+      font-size: 1.05rem;
+      font-style: italic;
+      color: var(--text);
+      line-height: 1.7;
+    }
+    .quote-author {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* ── CTA footer ── */
+    .cta-section {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 24px 80px;
+      text-align: center;
+    }
+    .cta-section h2 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+    .cta-section p {
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      font-size: 0.95rem;
+    }
+    .btn-primary {
+      display: inline-block;
+      background: var(--primary);
+      color: #fff;
+      padding: 13px 28px;
+      border-radius: 100px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: background var(--ease), transform var(--ease);
+      box-shadow: 0 4px 14px rgba(58,143,101,.35);
+    }
+    .btn-primary:hover {
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+    }
+
+    @media (max-width: 600px) {
+      .timeline-wrap::before { left: 44px; }
+      .tl-node { width: 34px; height: 34px; font-size: 0.95rem; }
+      .tl-card { padding: 16px; }
+      .hero { padding: 48px 16px 32px; }
+      .timeline-wrap { padding: 16px 16px 60px; }
+      .stats-bar { padding: 0 16px; }
+      .quote-block { padding: 0 16px; }
+      .cta-section { padding: 0 16px 60px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav class="nav">
+    <a class="nav-logo" href="/">🌿 ReflectAI</a>
+    <a class="nav-back" href="/">← Back to App</a>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="hero-badge">🚀 The Journey</div>
+    <h1>From <span>First Idea</span> to Live Product</h1>
+    <p>Every great product starts with a single conversation. Here's how ReflectAI went from a "what if" to a real app in people's hands.</p>
+    <p class="hero-meta">May 2026 → Present</p>
+  </header>
+
+  <!-- Stats -->
+  <div class="stats-bar" id="stats-bar">
+    <div class="stat-card">
+      <div class="stat-number">10</div>
+      <div class="stat-label">Days to ship v1</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">40+</div>
+      <div class="stat-label">Features built</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">3</div>
+      <div class="stat-label">Payment providers</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">2</div>
+      <div class="stat-label">Markets targeted</div>
+    </div>
+  </div>
+
+  <!-- Opening quote -->
+  <div class="quote-block">
+    <div class="quote-inner">
+      <p class="quote-text">"What if there was an AI journaling app built for students and young professionals in Nigeria — one that actually helps you grow, not just write?"</p>
+      <p class="quote-author">— The first conversation, May 2026</p>
+    </div>
+  </div>
+
+  <!-- Timeline -->
+  <div class="timeline-wrap" id="timeline">
+
+    <!-- 1: The Idea -->
+    <div class="tl-entry">
+      <div class="tl-node highlight">💡</div>
+      <div class="tl-card highlight">
+        <div class="tl-date">The Beginning · May 2026</div>
+        <div class="tl-title">The Spark: "What if journaling could be smarter?"</div>
+        <div class="tl-desc">It started as a single question in a conversation: could AI make journaling genuinely useful — not just a place to dump thoughts, but a tool that reflects back insight, tracks mood, and coaches growth? The target: students and young professionals across Nigeria and beyond.</div>
+        <div class="tl-tags">
+          <span class="tl-tag">💬 Initial Idea</span>
+          <span class="tl-tag">🎯 Problem Statement</span>
+          <span class="tl-tag">🇳🇬 Nigerian Market</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2: Day 1 - Initial Build -->
+    <div class="tl-entry">
+      <div class="tl-node">🏗️</div>
+      <div class="tl-card">
+        <div class="tl-date">May 24, 2026 · Day 1</div>
+        <div class="tl-title">Foundation: First Working Version</div>
+        <div class="tl-desc">The initial commit landed with a complete working app — user auth, daily journal entries, mood tracking, AI-generated reflections via Claude, and payment integration with both Paystack and Stripe. Not a prototype: a real product from day one.</div>
+        <div class="tl-tags">
+          <span class="tl-tag">🔐 Auth</span>
+          <span class="tl-tag">📝 Journaling</span>
+          <span class="tl-tag">🤖 Claude AI</span>
+          <span class="tl-tag">💳 Payments</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3: PWA -->
+    <div class="tl-entry">
+      <div class="tl-node">📱</div>
+      <div class="tl-card">
+        <div class="tl-date">May 24, 2026 · Same Day</div>
+        <div class="tl-title">Mobile-First: PWA Support Launched</div>
+        <div class="tl-desc">Added Progressive Web App support with a service worker, manifest, icons, and smart install banners for both Android and iOS. Users could install ReflectAI to their home screen and use it like a native app — critical for the mobile-first Nigerian audience.</div>
+        <div class="tl-tags">
+          <span class="tl-tag">📲 PWA</span>
+          <span class="tl-tag">📴 Offline-Ready</span>
+          <span class="tl-tag">🔔 Install Banner</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4: UX polish -->
+    <div class="tl-entry">
+      <div class="tl-node">✨</div>
+      <div class="tl-card">
+        <div class="tl-date">May 25–26, 2026 · Days 2–3</div>
+        <div class="tl-title">User Experience: Onboarding, Search, Legal</div>
+        <div class="tl-desc">Rolled out a 3-step first-time onboarding flow, trial access to Pro features so users could experience the value before paying, live keyword search in Entry History, a proper account dropdown, and full Privacy Policy and Terms of Service pages with Nigerian business details.</div>
+        <div class="tl-tags">
+          <span class="tl-tag">🎓 Onboarding</span>
+          <span class="tl-tag">🔍 Search</span>
+          <span class="tl-tag">⚖️ Legal</span>
+          <span class="tl-tag">🆓 Trial</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5: Geo pricing -->
+    <div class="tl-entry">
+      <div class="tl-node">🌍</div>
+      <div class="tl-card">
+        <div class="tl-date">May 27–29, 2026 · Days 4–6</div>
+        <div class="tl-title">Market Fit: Geo-Based Pricing for Two Markets</div>
+        <div class="tl-desc">Implemented smart geo-detection to show Nigerian users ₦3,000/month via Paystack or Flutterwave, while international users see $7.99/month via Stripe. Iterated through multiple approaches (server-side, client-side, caching) until the detection was bulletproof. The right price, for the right market, automatically.</div>
+        <div class="tl-tags">
+          <span class="tl-tag">₦ NGN 3,000</span>
+          <span class="tl-tag">$ $7.99</span>
+          <span class="tl-tag">🎯 Localisation</span>
+          <span class="tl-tag">🌐 Flutterwave</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6: AI Coach -->
+    <div class="tl-entry">
+      <div class="tl-node">🧠</div>
+      <div class="tl-card">
+        <div class="tl-date">May 29, 2026 · Day 6</div>
+        <div class="tl-title">AI Depth: Conversational Coaching Engine</div>
+        <div class="tl-desc">The reflection prompts evolved into a full AI coaching experience — multi-turn conversations, NLP presuppositions and language patterns woven into the prompts, session completion screens with progress indicators, and exchange limits (6 free / 10 Pro). The journal became a growth partner.</div>
+        <div class="tl-tags">
+          <span class="tl-tag">💬 Multi-turn Chat</span>
+          <span class="tl-tag">🧬 NLP Patterns</span>
+          <span class="tl-tag">🏁 Session Endings</span>
+          <span class="tl-tag">📊 Exchange Limits</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7: Growth infra -->
+    <div class="tl-entry">
+      <div class="tl-node">📈</div>
+      <div class="tl-card">
+        <div class="tl-date">May 30, 2026 · Day 7</div>
+        <div class="tl-title">Growth Infrastructure: Referrals & Email</div>
+        <div class="tl-desc">Built a complete referral system: unique codes, credit tracking, a shareable referral page, caps at 3 free months per year, and email notifications when a friend converts. Set up Gmail SMTP for transactional email, and shipped a password reset flow with 24-hour expiry links.</div>
+        <div class="tl-tags">
+          <span class="tl-tag">🔗 Referral System</span>
+          <span class="tl-tag">📧 Transactional Email</span>
+          <span class="tl-tag">🔑 Password Reset</span>
+          <span class="tl-tag">🎁 Credits</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8: Research -->
+    <div class="tl-entry">
+      <div class="tl-node">🔬</div>
+      <div class="tl-card">
+        <div class="tl-date">June 1, 2026 · Day 9</div>
+        <div class="tl-title">Research Mode: Listening to the Market</div>
+        <div class="tl-desc">Replaced the generic feedback form with a 9-question market research survey to capture real user insight. Wove African cultural context into every Claude AI system prompt so the coaching feels local and relevant — not like it was built for Silicon Valley. Built feedback analytics for the admin dashboard.</div>
+        <div class="tl-tags">
+          <span class="tl-tag">📋 9-Q Survey</span>
+          <span class="tl-tag">🌍 African Context</span>
+          <span class="tl-tag">📊 Analytics</span>
+          <span class="tl-tag">🎙️ User Research</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 9: Now -->
+    <div class="tl-entry">
+      <div class="tl-node current">⭐</div>
+      <div class="tl-card current">
+        <div class="tl-date">June 2, 2026 · Now</div>
+        <div class="tl-title">Today: PDF Export &amp; Ready to Scale</div>
+        <div class="tl-desc">Pro users can now export their entire journal as a beautifully formatted PDF — a meaningful artifact of their growth journey. The product is live, polished, and generating real revenue. What started as a single "what if" conversation is now a complete, paying product used by real people.</div>
+        <div class="tl-tags">
+          <span class="tl-tag">📄 PDF Export</span>
+          <span class="tl-tag">💰 Paying Users</span>
+          <span class="tl-tag">🚀 Live Product</span>
+          <span class="tl-tag">🌱 Growing</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /timeline-wrap -->
+
+  <!-- CTA -->
+  <div class="cta-section">
+    <h2>The story continues 🌿</h2>
+    <p>Every entry you write is part of your own timeline. Start yours today.</p>
+    <a href="/" class="btn-primary">Open ReflectAI →</a>
+  </div>
+
+  <script>
+    // Scroll-reveal for timeline entries
+    const entries = document.querySelectorAll('.tl-entry');
+    const observer = new IntersectionObserver((items) => {
+      items.forEach((item, i) => {
+        if (item.isIntersecting) {
+          setTimeout(() => item.target.classList.add('visible'), i * 80);
+          observer.unobserve(item.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    entries.forEach(el => observer.observe(el));
+
+    // Also reveal stats immediately
+    document.querySelectorAll('.stat-card').forEach((el, i) => {
+      setTimeout(() => {
+        el.style.opacity = '1';
+        el.style.transform = 'translateY(0)';
+      }, 100 + i * 80);
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(16px)';
+      el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+    });
+  </script>
+
+</body>
+</html>
