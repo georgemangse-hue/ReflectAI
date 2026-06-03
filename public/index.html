@@ -688,6 +688,14 @@
           </div>
         </div>
 
+        <!-- First name input -->
+        <div class="profile-name-row">
+          <input type="text" id="profile-name-input" class="profile-name-input"
+            placeholder="Add your first name…" maxlength="50" autocomplete="given-name"
+            onkeydown="if(event.key==='Enter')saveFirstName()"
+            onblur="saveFirstName()" />
+        </div>
+
         <!-- Upgrade banner (free users) -->
         <div id="profile-upgrade-banner" class="profile-upgrade-banner hidden">
           <p>Unlock AI tools, goals, insights &amp; PDF export.</p>

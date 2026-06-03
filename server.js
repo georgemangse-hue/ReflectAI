@@ -359,6 +359,7 @@ function userShape(u) {
   return {
     id:                 u.id,
     email:              u.email,
+    firstName:          u.firstName || null,
     plan:               u.plan,
     paid:               u.paid === true,
     subscriptionStatus: u.subscriptionStatus  || null,
@@ -2068,6 +2069,16 @@ Your check-in should note any specific evidence from the journal entries that re
       const salt = crypto.randomBytes(32).toString('hex');
       updateUser(user.id, { passwordHash: hashPassword(newPassword, salt), salt });
       return sendJSON(res, 200, { ok: true });
+    }
+
+    if (method === 'PATCH' && url === '/api/auth/profile') {
+      const user = requireAuth(req, res);
+      if (!user) return;
+      const { firstName } = await readBody(req);
+      const trimmed = (firstName || '').trim().slice(0, 50);
+      updateUser(user.id, { firstName: trimmed || null });
+      const updated = readJSON(USERS_FILE).find(u => u.id === user.id);
+      return sendJSON(res, 200, { user: userShape(updated) });
     }
 
     /* ==============================================================

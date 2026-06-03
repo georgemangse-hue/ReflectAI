@@ -673,6 +673,28 @@
   color: var(--text-muted);
 }
 
+/* First name input */
+.profile-name-row {
+  margin-bottom: 1.25rem;
+}
+.profile-name-input {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+.profile-name-input:focus {
+  border-color: var(--active-green);
+  box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.12);
+}
+.profile-name-input::placeholder { color: var(--text-muted); }
+
 /* Upgrade banner */
 .profile-upgrade-banner {
   background: var(--light-green);

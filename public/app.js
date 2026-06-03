@@ -2166,10 +2166,7 @@ function renderHomeTab() {
   const now  = new Date();
   const hour = now.getHours();
   const tod  = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  const firstName = state.user
-    ? (state.user.email.split('@')[0].replace(/[._-]/g, ' ').trim().split(' ')[0] || '')
-        .replace(/^\w/, c => c.toUpperCase())
-    : '';
+  const firstName = (state.user?.firstName || '').trim();
   const greetEl = document.getElementById('home-greeting');
   if (greetEl) greetEl.textContent = tod + (firstName ? ', ' + firstName : '') + ' 🌿';
 
@@ -2540,10 +2537,17 @@ function updateProfileUI(user) {
   if (!user) return;
   const isPro = user.plan === 'pro';
 
-  const parts    = user.email.split('@')[0].replace(/[._-]+/g, ' ').split(' ').filter(Boolean);
-  const initials = parts.map(w => (w[0] || '').toUpperCase()).slice(0, 2).join('') || '?';
+  const displayName = (user.firstName || '').trim();
+  const initials    = displayName
+    ? displayName.slice(0, 1).toUpperCase()
+    : (user.email[0] || '?').toUpperCase();
   const avatarEl = document.getElementById('profile-avatar');
   if (avatarEl) avatarEl.textContent = initials;
+
+  const nameInput = document.getElementById('profile-name-input');
+  if (nameInput && document.activeElement !== nameInput) {
+    nameInput.value = displayName;
+  }
 
   const emailEl = document.getElementById('profile-email-display');
   if (emailEl) emailEl.textContent = user.email;
@@ -2589,6 +2593,21 @@ function renderProfileStats() {
   wordsEl.textContent = totalWords > 9999 ? Math.round(totalWords / 1000) + 'k' : totalWords;
   daysEl.textContent  = new Set(state.entries.map(e => e.date)).size;
   streakEl.textContent = state.streak;
+}
+
+async function saveFirstName() {
+  const input = document.getElementById('profile-name-input');
+  if (!input) return;
+  const name = input.value.trim();
+  try {
+    const data = await api('PATCH', '/api/auth/profile', { firstName: name });
+    if (!data) return;
+    state.user = { ...state.user, ...data.user };
+    updateProfileUI(state.user);
+    renderHomeTab();
+    input.blur();
+    showToast('Name updated!');
+  } catch (e) { showToast('Could not save name: ' + e.message); }
 }
 
 function toggleChangePassword() {
