@@ -360,6 +360,7 @@ function userShape(u) {
     id:                 u.id,
     email:              u.email,
     firstName:          u.firstName || null,
+    lastName:           u.lastName  || null,
     plan:               u.plan,
     paid:               u.paid === true,
     subscriptionStatus: u.subscriptionStatus  || null,
@@ -2074,9 +2075,11 @@ Your check-in should note any specific evidence from the journal entries that re
     if (method === 'PATCH' && url === '/api/auth/profile') {
       const user = requireAuth(req, res);
       if (!user) return;
-      const { firstName } = await readBody(req);
-      const trimmed = (firstName || '').trim().slice(0, 50);
-      updateUser(user.id, { firstName: trimmed || null });
+      const { firstName, lastName } = await readBody(req);
+      updateUser(user.id, {
+        firstName: (firstName || '').trim().slice(0, 50) || null,
+        lastName:  (lastName  || '').trim().slice(0, 50) || null,
+      });
       const updated = readJSON(USERS_FILE).find(u => u.id === user.id);
       return sendJSON(res, 200, { user: userShape(updated) });
     }

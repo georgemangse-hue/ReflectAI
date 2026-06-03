@@ -660,27 +660,86 @@
   color: var(--text-muted);
 }
 
-/* First name input */
-.profile-name-row {
-  margin-bottom: 1.25rem;
+/* Full name display in header */
+.profile-full-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.1rem;
+  line-height: 1.25;
 }
-.profile-name-input {
+
+/* Edit profile button next to header */
+.profile-edit-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  align-self: flex-start;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.profile-edit-btn:hover {
+  color: var(--active-green);
+  border-color: var(--active-green);
+  background: var(--light-green);
+}
+[data-theme="dark"] .profile-edit-btn:hover { background: var(--primary-light); }
+
+/* Edit profile form */
+.profile-edit-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.15rem 1rem;
+  margin-bottom: 1.25rem;
+  box-shadow: var(--shadow-sm);
+  animation: fadeSlideUp 0.2s var(--ease-out);
+}
+.profile-edit-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+@media (max-width: 400px) {
+  .profile-edit-row { grid-template-columns: 1fr; }
+}
+.profile-edit-input {
   width: 100%;
-  padding: 0.65rem 1rem;
+  padding: 0.6rem 0.85rem;
   border: 2px solid var(--border);
   border-radius: var(--radius-sm);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-family: inherit;
   color: var(--text);
   background: var(--surface);
   outline: none;
   transition: border-color var(--ease), box-shadow var(--ease);
 }
-.profile-name-input:focus {
+.profile-edit-input:focus {
   border-color: var(--active-green);
   box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.12);
 }
-.profile-name-input::placeholder { color: var(--text-muted); }
+.profile-edit-input::placeholder { color: var(--text-muted); }
+.profile-edit-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.profile-edit-success {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--active-green);
+  margin-bottom: 0.65rem;
+}
 
 /* Upgrade banner */
 .profile-upgrade-banner {

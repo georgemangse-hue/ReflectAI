@@ -664,23 +664,42 @@
       <div class="tab-scroll">
 
         <!-- Avatar + user info -->
+        <!-- Avatar + name + edit button -->
         <div class="profile-header">
           <div class="profile-avatar" id="profile-avatar">?</div>
           <div class="profile-user-info">
+            <div class="profile-full-name" id="profile-full-name"></div>
             <div class="profile-email" id="profile-email-display">—</div>
             <div class="profile-plan-row">
               <span class="plan-badge" id="profile-plan-badge">FREE</span>
               <span class="profile-member-since" id="profile-member-since"></span>
             </div>
           </div>
+          <button class="profile-edit-btn" onclick="openEditProfile()" id="profile-edit-btn" aria-label="Edit profile">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Edit
+          </button>
         </div>
 
-        <!-- First name input -->
-        <div class="profile-name-row">
-          <input type="text" id="profile-name-input" class="profile-name-input"
-            placeholder="Add your first name…" maxlength="50" autocomplete="given-name"
-            onkeydown="if(event.key==='Enter')saveFirstName()"
-            onblur="saveFirstName()" />
+        <!-- Edit profile form (hidden until Edit is clicked) -->
+        <div id="profile-edit-form" class="profile-edit-form hidden">
+          <div class="profile-edit-row">
+            <div class="form-group">
+              <label for="edit-first-name">First name</label>
+              <input type="text" id="edit-first-name" class="profile-edit-input"
+                placeholder="First name" maxlength="50" autocomplete="given-name" />
+            </div>
+            <div class="form-group">
+              <label for="edit-last-name">Last name</label>
+              <input type="text" id="edit-last-name" class="profile-edit-input"
+                placeholder="Last name" maxlength="50" autocomplete="family-name" />
+            </div>
+          </div>
+          <p class="profile-edit-success hidden" id="profile-edit-success">Profile updated!</p>
+          <div class="profile-edit-actions">
+            <button class="btn btn-primary btn-sm" onclick="saveProfileEdit()">Save</button>
+            <button class="btn btn-ghost btn-sm" onclick="cancelEditProfile()">Cancel</button>
+          </div>
         </div>
 
         <!-- Upgrade banner (free users) -->

@@ -2166,7 +2166,9 @@ function renderHomeTab() {
   const now  = new Date();
   const hour = now.getHours();
   const tod  = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  const firstName = (state.user?.firstName || '').trim();
+  // Use saved firstName; fall back to the email prefix if nothing is set
+  const firstName = (state.user?.firstName || '').trim() ||
+                    (state.user?.email || '').split('@')[0];
   const greetEl = document.getElementById('home-greeting');
   if (greetEl) greetEl.textContent = tod + (firstName ? ', ' + firstName : '') + ' 🌿';
 
@@ -2537,17 +2539,19 @@ function updateProfileUI(user) {
   if (!user) return;
   const isPro = user.plan === 'pro';
 
-  const displayName = (user.firstName || '').trim();
-  const initials    = displayName
-    ? displayName.slice(0, 1).toUpperCase()
-    : (user.email[0] || '?').toUpperCase();
+  const firstName   = (user.firstName || '').trim();
+  const lastName    = (user.lastName  || '').trim();
+  const fullName    = [firstName, lastName].filter(Boolean).join(' ');
+  // Initials: first letter of first name + first letter of last name
+  const initials    = [firstName, lastName]
+    .filter(Boolean).map(n => n[0].toUpperCase()).slice(0, 2).join('')
+    || (user.email[0] || '?').toUpperCase();
+
   const avatarEl = document.getElementById('profile-avatar');
   if (avatarEl) avatarEl.textContent = initials;
 
-  const nameInput = document.getElementById('profile-name-input');
-  if (nameInput && document.activeElement !== nameInput) {
-    nameInput.value = displayName;
-  }
+  const fullNameEl = document.getElementById('profile-full-name');
+  if (fullNameEl) fullNameEl.textContent = fullName || '';
 
   const emailEl = document.getElementById('profile-email-display');
   if (emailEl) emailEl.textContent = user.email;
@@ -2595,19 +2599,44 @@ function renderProfileStats() {
   streakEl.textContent = state.streak;
 }
 
-async function saveFirstName() {
-  const input = document.getElementById('profile-name-input');
-  if (!input) return;
-  const name = input.value.trim();
+function openEditProfile() {
+  const form    = document.getElementById('profile-edit-form');
+  const editBtn = document.getElementById('profile-edit-btn');
+  if (!form) return;
+  const fn = document.getElementById('edit-first-name');
+  const ln = document.getElementById('edit-last-name');
+  if (fn) fn.value = (state.user?.firstName || '').trim();
+  if (ln) ln.value = (state.user?.lastName  || '').trim();
+  document.getElementById('profile-edit-success')?.classList.add('hidden');
+  form.classList.remove('hidden');
+  if (editBtn) editBtn.style.display = 'none';
+  fn?.focus();
+}
+
+function cancelEditProfile() {
+  document.getElementById('profile-edit-form')?.classList.add('hidden');
+  document.getElementById('profile-edit-success')?.classList.add('hidden');
+  const editBtn = document.getElementById('profile-edit-btn');
+  if (editBtn) editBtn.style.display = '';
+}
+
+async function saveProfileEdit() {
+  const fn = (document.getElementById('edit-first-name')?.value || '').trim();
+  const ln = (document.getElementById('edit-last-name')?.value  || '').trim();
+  const successEl = document.getElementById('profile-edit-success');
   try {
-    const data = await api('PATCH', '/api/auth/profile', { firstName: name });
+    const data = await api('PATCH', '/api/auth/profile', { firstName: fn, lastName: ln });
     if (!data) return;
     state.user = { ...state.user, ...data.user };
     updateProfileUI(state.user);
     renderHomeTab();
-    input.blur();
-    showToast('Name updated!');
-  } catch (e) { showToast('Could not save name: ' + e.message); }
+    renderProfileStats();
+    if (successEl) {
+      successEl.classList.remove('hidden');
+      setTimeout(() => successEl.classList.add('hidden'), 3000);
+    }
+    setTimeout(cancelEditProfile, 1800);
+  } catch (e) { showToast('Could not save: ' + e.message); }
 }
 
 function toggleChangePassword() {
