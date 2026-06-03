@@ -2655,10 +2655,110 @@ async function submitChangePassword() {
 /* ================================================================
    24. BOOT
 ================================================================ */
+/* ================================================================
+   31. SWIPE GESTURE NAVIGATION (mobile only, < 768px)
+================================================================ */
+function initSwipeNav() {
+  const TAB_ORDER       = ['home', 'journal', 'insights', 'goals', 'profile'];
+  const SWIPE_THRESHOLD = 50; // px minimum to count as a swipe
+  const ANIM_MS         = 280; // must match CSS transition duration
+
+  let touchStartX   = 0;
+  let touchStartY   = 0;
+  let swipeDisabled = false; // true when touch started on a text input
+  let isAnimating   = false;
+
+  const main = document.getElementById('tab-main');
+  if (!main) return;
+
+  main.addEventListener('touchstart', e => {
+    const t = e.target;
+    // Disable swipe if the touch began inside a textarea, input, or
+    // horizontally-scrollable strip (entry chips), so those still work.
+    swipeDisabled =
+      t.tagName === 'TEXTAREA' ||
+      t.tagName === 'INPUT'    ||
+      t.tagName === 'SELECT'   ||
+      !!t.closest('textarea, input, select, .entry-strip');
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  main.addEventListener('touchend', e => {
+    if (swipeDisabled || isAnimating)    return;
+    if (window.innerWidth >= 768)        return; // sidebar handles desktop
+
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+
+    // Ignore if the gesture is more vertical than horizontal (scrolling)
+    if (Math.abs(dy) >= Math.abs(dx))   return;
+    if (Math.abs(dx) < SWIPE_THRESHOLD) return;
+
+    const currentName = localStorage.getItem(TAB_KEY) || 'home';
+    const currentIdx  = TAB_ORDER.indexOf(currentName);
+    const direction   = dx < 0 ? 'left' : 'right';
+    const nextIdx     = currentIdx + (direction === 'left' ? 1 : -1);
+
+    // Don't swipe past the first or last tab
+    if (nextIdx < 0 || nextIdx >= TAB_ORDER.length) return;
+
+    _animateToTab(currentName, TAB_ORDER[nextIdx], direction);
+  }, { passive: true });
+
+  function _animateToTab(fromName, toName, direction) {
+    if (isAnimating) return;
+    isAnimating = true;
+
+    const outgoing = document.getElementById('tab-' + fromName);
+    const incoming = document.getElementById('tab-' + toName);
+    if (!outgoing || !incoming) { isAnimating = false; return; }
+
+    const enterFrom = direction === 'left' ?  '100%' : '-100%';
+    const exitTo    = direction === 'left' ? '-100%' :  '100%';
+
+    // Place incoming off-screen and make it visible (but not yet scrolled)
+    incoming.style.transform = 'translateX(' + enterFrom + ')';
+    incoming.style.transition = 'none';
+    incoming.classList.remove('hidden');
+
+    // Trigger a reflow so the browser registers the initial transform
+    // before we start the transition
+    incoming.getBoundingClientRect();
+
+    // Animate both panes simultaneously
+    const timing = 'transform ' + ANIM_MS + 'ms ease';
+    incoming.style.transition = timing;
+    outgoing.style.transition = timing;
+
+    requestAnimationFrame(() => {
+      incoming.style.transform = 'translateX(0)';
+      outgoing.style.transform = 'translateX(' + exitTo + ')';
+    });
+
+    setTimeout(() => {
+      // Clear all inline styles set during animation
+      incoming.style.transition = '';
+      incoming.style.transform  = '';
+      outgoing.style.transition = '';
+      outgoing.style.transform  = '';
+      isAnimating = false;
+
+      // Hand off to the normal switchTab so nav, localStorage,
+      // and any tab-init callbacks (renderGoals, etc.) all fire correctly.
+      switchTab(toName);
+    }, ANIM_MS + 10);
+  }
+}
+
+/* ================================================================
+   24. BOOT
+================================================================ */
 document.addEventListener('DOMContentLoaded', async () => {
   captureReferralCode();
   initTheme();
   initApp();
+  initSwipeNav();
   initAutoResize(document.getElementById('journal-input'));
   await loadConfig();
   await initAuth();
