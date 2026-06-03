@@ -276,13 +276,17 @@ async function handleLogout() {
   await api('POST', '/api/auth/logout').catch(() => {});
   clearAuthState();
   hidePaymentWall();
-  document.getElementById('journal-input').value = '';
+  _moodLogs = []; _insightsLoaded = false;
+  if (_insightsMoodChart) { _insightsMoodChart.destroy(); _insightsMoodChart = null; }
+  const ta = document.getElementById('journal-input');
+  if (ta) ta.value = '';
   document.getElementById('char-count').textContent = '0 words';
-  document.getElementById('prompts-section').classList.add('hidden');
-  document.getElementById('mood-section').classList.add('hidden');
+  document.getElementById('prompts-section')?.classList.add('hidden');
   clearMoodSelection();
   renderHistory();
   renderStreak(0);
+  localStorage.removeItem(TAB_KEY);
+  switchTab('home');
   showAuthOverlay();
   showToast('You have been logged out.');
 }
@@ -301,20 +305,16 @@ function applyUserUI(user) {
   document.getElementById('dropdown-plan-label').textContent = isPro ? 'Pro plan' : 'Free plan';
   document.getElementById('dropdown-upgrade-btn').classList.toggle('hidden', isPro);
   applySubscriptionUI(user);
-
-  // Update hero CTA button label
-  const heroBtn = document.getElementById('hero-cta-btn');
-  if (heroBtn) heroBtn.textContent = 'Go to Journal →';
+  updateProfileUI(user);
 
   applyProGates(isPro);
 }
 
 function applyProGates(isPro) {
-  // All users get trial access — hide the lock overlays, show the content
-  document.getElementById('weekly-lock').classList.add('hidden');
-  document.getElementById('weekly-content').classList.remove('hidden');
-  document.getElementById('goals-lock').classList.add('hidden');
-  document.getElementById('goals-content').classList.remove('hidden');
+  document.getElementById('weekly-lock')?.classList.add('hidden');
+  document.getElementById('weekly-content')?.classList.remove('hidden');
+  document.getElementById('goals-lock')?.classList.add('hidden');
+  document.getElementById('goals-content')?.classList.remove('hidden');
 
   // Show trial notes only for free users
   const weeklyNote = document.getElementById('weekly-trial-note');
@@ -379,7 +379,7 @@ async function exportJournal() {
 
 async function initAuth() {
   const token = localStorage.getItem('reflectai_token');
-  if (!token) { showAuthOverlay(); return; }
+  if (!token) { showAuthOverlay(); restoreTab(); return; }
   try {
     const data = await api('GET', '/api/auth/me');
     if (!data) return;
@@ -387,12 +387,13 @@ async function initAuth() {
     hideAuthOverlay();
     applyUserUI(data.user);
     await loadAppData();
-  } catch { showAuthOverlay(); }
+  } catch { showAuthOverlay(); restoreTab(); }
 }
 
 function showUpgradeModal()  { showPaymentWall(); }
 function closeUpgradeModal() { hidePaymentWall(); }
 function closePaymentWall()  { hidePaymentWall(); }
+function handleUpgrade()     { closeUpgradeModal(); showPaymentWall(); }
 
 
 /* ================================================================
@@ -824,7 +825,9 @@ function initApp() {
 async function loadAppData() {
   await loadEntries();
   await loadGoals();
-  loadReferralStats(); // fire-and-forget — updates dropdown when ready
+  await loadMoodLogs();
+  loadReferralStats();
+  restoreTab();
   if (shouldShowOnboarding()) startOnboarding();
 }
 
@@ -852,6 +855,7 @@ async function loadEntries() {
 
     renderStreak(state.streak);
     renderHistory();
+    renderEntryStrip();
     renderMoodSection();
   } catch (err) { console.error('[loadEntries]', err.message); }
 }
@@ -1189,7 +1193,7 @@ document.getElementById('journal-form').addEventListener('submit', async functio
     clearDraft();
   } catch (err) {
     showToast('Could not save entry: ' + err.message);
-    submitBtn.disabled = false; submitBtn.textContent = 'Get Reflection Prompts →';
+    submitBtn.disabled = false; submitBtn.textContent = 'Save & Reflect →';
     return;
   }
 
@@ -1199,7 +1203,7 @@ document.getElementById('journal-form').addEventListener('submit', async functio
   promptsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   await fetchReflectionPrompts(text);
 
-  submitBtn.disabled = false; submitBtn.textContent = 'Get Reflection Prompts →';
+  submitBtn.disabled = false; submitBtn.textContent = 'Save & Reflect →';
 });
 
 
@@ -1649,20 +1653,25 @@ async function loadGoals() {
 
 async function handleAddGoal(e) {
   e.preventDefault();
-  const titleEl = document.getElementById('goal-title');
-  const dateEl  = document.getElementById('goal-target-date');
-  const descEl  = document.getElementById('goal-description');
-  const btn     = document.getElementById('add-goal-btn');
-  const title   = titleEl.value.trim();
+  const titleEl    = document.getElementById('goal-title');
+  const dateEl     = document.getElementById('goal-target-date');
+  const categoryEl = document.getElementById('goal-category');
+  const btn        = document.getElementById('add-goal-btn');
+  const title      = titleEl.value.trim();
   if (!title) { showToast('Please enter a goal title.'); return; }
 
   btn.disabled = true; btn.textContent = 'Adding…';
   try {
-    const data = await api('POST', '/api/goals', { title, description: descEl.value.trim(), targetDate: dateEl.value || null });
+    const data = await api('POST', '/api/goals', {
+      title,
+      targetDate: dateEl.value || null,
+      category:   categoryEl?.value || null
+    });
     if (!data) return;
     state.goals.unshift(data.goal);
     renderGoals();
-    titleEl.value = ''; dateEl.value = ''; descEl.value = '';
+    titleEl.value = ''; dateEl.value = '';
+    if (categoryEl) categoryEl.value = '';
     showToast('Goal added!');
   } catch (err) { showToast('Could not add goal: ' + err.message); }
   finally { btn.disabled = false; btn.textContent = 'Add Goal'; }
@@ -1715,36 +1724,34 @@ function updateGoalsTrialNote() {
 
 function renderGoals() {
   updateGoalsTrialNote();
-  const container = document.getElementById('goals-list');
-  if (!state.goals.length) {
-    container.innerHTML = `<div class="goals-empty"><p>No goals yet. Add your first goal above — your journal entries will help track your progress.</p></div>`;
-    return;
-  }
+  const container   = document.getElementById('goals-list');
+  const compSection = document.getElementById('completed-goals-section');
+  const compList    = document.getElementById('completed-goals-list');
+  const compCount   = document.getElementById('completed-count');
+  if (!container) return;
+
+  const activeGoals    = state.goals.filter(g => g.status !== 'completed');
+  const completedGoals = state.goals.filter(g => g.status === 'completed');
+
   container.innerHTML = '';
-  state.goals.forEach(goal => {
-    const isDone  = goal.status === 'completed';
-    const dateStr = goal.targetDate ? `Target: ${formatTargetDate(goal.targetDate)}` : '';
-    const card    = document.createElement('div');
-    card.className = `goal-card${isDone ? ' goal-done' : ''}`;
-    card.innerHTML = `
-      <div class="goal-card-header">
-        <div class="goal-card-info">
-          <h3 class="goal-title-text">${escapeHTML(goal.title)}</h3>
-          ${goal.description ? `<p class="goal-desc-text">${escapeHTML(goal.description)}</p>` : ''}
-          <div class="goal-meta-row">
-            <span class="goal-status-badge ${isDone ? 'done' : 'active'}">${isDone ? '✓ Completed' : '● Active'}</span>
-            ${dateStr ? `<span class="goal-date-text">${escapeHTML(dateStr)}</span>` : ''}
-          </div>
-        </div>
-        <div class="goal-card-actions">
-          <button class="btn btn-sm btn-secondary" onclick="toggleGoalStatus('${goal.id}')">${isDone ? 'Reopen' : '✓ Complete'}</button>
-          <button class="btn btn-sm btn-secondary" id="checkin-btn-${goal.id}" onclick="goalCheckin('${goal.id}')">🤖 Check in</button>
-          <button class="btn btn-sm btn-ghost-danger" onclick="deleteGoal('${goal.id}')">Delete</button>
-        </div>
-      </div>
-      <div class="goal-checkin-result hidden" id="checkin-out-${goal.id}"></div>`;
-    container.appendChild(card);
-  });
+  if (!activeGoals.length) {
+    container.innerHTML = '<div class="goals-empty"><p>No active goals. Add one above!</p></div>';
+  } else {
+    activeGoals.forEach(g => renderGoalCard(container, g));
+  }
+
+  if (completedGoals.length > 0) {
+    compSection?.classList.remove('hidden');
+    if (compCount) compCount.textContent = completedGoals.length;
+    if (compList) {
+      compList.innerHTML = '';
+      completedGoals.forEach(g => renderGoalCard(compList, g));
+    }
+  } else {
+    compSection?.classList.add('hidden');
+  }
+
+  renderHomeGoalsSnapshot();
 }
 
 
@@ -2103,13 +2110,536 @@ async function triggerPwaInstall() {
 
 
 /* ================================================================
+   25. TAB NAVIGATION
+================================================================ */
+const TAB_KEY = 'reflectai_tab';
+let _insightsMoodChart = null;
+let _moodLogs          = [];
+let _insightsLoaded    = false;
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
+  const pane = document.getElementById('tab-' + name);
+  if (pane) pane.classList.remove('hidden');
+
+  document.querySelectorAll('.bottom-nav-item').forEach(btn => {
+    const active = btn.dataset.tab === name;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+
+  localStorage.setItem(TAB_KEY, name);
+
+  // Make reveal elements in new tab visible immediately
+  document.querySelectorAll(`#tab-${name} .reveal`).forEach(el => el.classList.add('visible'));
+
+  if (name === 'home')     renderHomeTab();
+  if (name === 'journal')  { renderEntryStrip(); updateFreeEntryCounter(); }
+  if (name === 'insights') initInsightsTab();
+  if (name === 'goals')    renderGoals();
+  if (name === 'profile')  renderProfileStats();
+}
+
+function restoreTab() {
+  const saved = localStorage.getItem(TAB_KEY) || 'home';
+  switchTab(saved);
+}
+
+
+/* ================================================================
+   26. HOME TAB
+================================================================ */
+const HOME_QUOTES = [
+  { text: "The secret of getting ahead is getting started.", source: "Mark Twain" },
+  { text: "Small daily improvements are the key to staggering long-term results.", source: "Robin Sharma" },
+  { text: "You don't have to be great to start, but you have to start to be great.", source: "Zig Ziglar" },
+  { text: "It always seems impossible until it's done.", source: "Nelson Mandela" },
+  { text: "However long the night, the dawn will break.", source: "African proverb" },
+  { text: "If you want to go fast, go alone. If you want to go far, go together.", source: "African proverb" },
+  { text: "Knowledge is like a garden: if it is not cultivated, it cannot be harvested.", source: "African proverb" },
+  { text: "A winner is a dreamer who never gives up.", source: "Nelson Mandela" },
+  { text: "The world is like a mask dancing. If you want to see it well, you do not stand in one place.", source: "Chinua Achebe" },
+  { text: "Until the lion tells its own story, the hunter will always be the hero.", source: "African proverb" },
+];
+
+function renderHomeTab() {
+  const now  = new Date();
+  const hour = now.getHours();
+  const tod  = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const firstName = state.user
+    ? (state.user.email.split('@')[0].replace(/[._-]/g, ' ').trim().split(' ')[0] || '')
+        .replace(/^\w/, c => c.toUpperCase())
+    : '';
+  const greetEl = document.getElementById('home-greeting');
+  if (greetEl) greetEl.textContent = tod + (firstName ? ', ' + firstName : '') + ' 🌿';
+
+  const dateEl = document.getElementById('home-date');
+  if (dateEl) dateEl.textContent = now.toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  });
+
+  const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+  const q = HOME_QUOTES[dayOfYear % HOME_QUOTES.length];
+  const qtEl = document.getElementById('home-quote-text');
+  const qsEl = document.getElementById('home-quote-source');
+  if (qtEl) qtEl.textContent = '“' + q.text + '”';
+  if (qsEl) qsEl.textContent = '— ' + q.source;
+
+  renderHomeMoodCheckIn();
+  renderHomeGoalsSnapshot();
+}
+
+async function loadMoodLogs() {
+  try {
+    const data = await api('GET', '/api/mood-logs');
+    if (!data) return;
+    _moodLogs = data.logs || [];
+    renderHomeMoodCheckIn();
+  } catch (e) { console.error('[loadMoodLogs]', e.message); }
+}
+
+function renderHomeMoodCheckIn() {
+  const today    = getTodayISO();
+  const todayLog = _moodLogs.find(l => l.date === today);
+  const loggedEl = document.getElementById('home-mood-logged');
+  const rowEl    = document.getElementById('home-mood-row');
+  if (!rowEl) return;
+
+  rowEl.querySelectorAll('.quick-mood-btn').forEach(btn => btn.classList.remove('selected'));
+
+  if (todayLog) {
+    const EM = { awful: '😞', meh: '😐', okay: '🙂', good: '😊', great: '🤩' };
+    const btn = rowEl.querySelector(`[data-qmood="${todayLog.mood}"]`);
+    if (btn) btn.classList.add('selected');
+    if (loggedEl) {
+      loggedEl.textContent = `You’re feeling ${todayLog.mood} today ${EM[todayLog.mood] || ''}`;
+      loggedEl.classList.remove('hidden');
+    }
+  } else {
+    if (loggedEl) loggedEl.classList.add('hidden');
+  }
+}
+
+async function logQuickMood(mood) {
+  try {
+    const data = await api('POST', '/api/mood-logs', { mood });
+    if (!data) return;
+    _moodLogs = _moodLogs.filter(l => l.date !== data.log.date);
+    _moodLogs.unshift(data.log);
+    renderHomeMoodCheckIn();
+    _insightsLoaded = false; // so chart refreshes next time Insights opens
+    const EM = { awful: '😞', meh: '😐', okay: '🙂', good: '😊', great: '🤩' };
+    showToast('Mood logged ' + (EM[mood] || ''));
+  } catch (e) { showToast('Could not save mood: ' + e.message); }
+}
+
+function renderHomeGoalsSnapshot() {
+  const list = document.getElementById('home-goals-list');
+  if (!list) return;
+  const active = state.goals.filter(g => g.status !== 'completed').slice(0, 3);
+  if (!active.length) {
+    list.innerHTML = '<div class="home-goals-empty"><button class="home-link-btn" onclick="switchTab(\'goals\')">Set your first goal →</button></div>';
+    return;
+  }
+  list.innerHTML = active.map(g => `
+    <div class="home-goal-item">
+      <div class="home-goal-title">${escapeHTML(g.title)}</div>
+      <div class="home-goal-progress-bar">
+        <div class="home-goal-progress-fill" style="width:${g.progress || 0}%"></div>
+      </div>
+    </div>`).join('');
+}
+
+
+/* ================================================================
+   27. JOURNAL TAB — entry strip + past entry modal
+================================================================ */
+function renderEntryStrip() {
+  const strip = document.getElementById('entry-strip');
+  if (!strip) return;
+  const recent = state.entries.slice(0, 3);
+  if (!recent.length) { strip.innerHTML = ''; return; }
+  strip.innerHTML = recent.map(e => {
+    const d = new Date(e.date + 'T00:00:00');
+    const label = d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
+    return `<button class="entry-chip" onclick="openPastEntryModal('${escapeHTML(e.date)}')">${escapeHTML(label)}</button>`;
+  }).join('');
+}
+
+function openPastEntryModal(date) {
+  const entry = state.entries.find(e => e.date === date);
+  if (!entry) return;
+  const d = new Date(date + 'T00:00:00');
+  document.getElementById('past-entry-modal-date').textContent =
+    d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const mood   = moodById(entry.mood);
+  const moodEl = document.getElementById('past-entry-modal-mood');
+  if (moodEl) moodEl.textContent = mood ? mood.emoji + ' ' + mood.label : '';
+  document.getElementById('past-entry-modal-body').textContent = entry.text;
+  document.getElementById('past-entry-modal').classList.remove('hidden');
+}
+
+function closePastEntryModal() {
+  document.getElementById('past-entry-modal')?.classList.add('hidden');
+}
+
+
+/* ================================================================
+   28. INSIGHTS TAB
+================================================================ */
+function initInsightsTab() {
+  if (_insightsLoaded) return;
+  _insightsLoaded = true;
+  renderInsightsMoodChart();
+  loadWeeklySummary();
+  const isPro = state.userPlan === 'pro';
+  document.getElementById('export-pro-section')?.classList.toggle('hidden', !isPro);
+  document.getElementById('export-free-section')?.classList.toggle('hidden', isPro);
+}
+
+function renderInsightsMoodChart() {
+  const wrap    = document.getElementById('insights-chart-wrap');
+  const emptyEl = document.getElementById('insights-mood-empty');
+  if (!wrap) return;
+
+  const today = new Date();
+  const labels = [], scores = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const iso = d.toISOString().split('T')[0];
+    const log = _moodLogs.find(l => l.date === iso);
+    labels.push(d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' }));
+    scores.push(log ? log.score : null);
+  }
+
+  const hasData = scores.some(s => s !== null);
+  if (!hasData) {
+    wrap.classList.add('hidden');
+    emptyEl?.classList.remove('hidden');
+    return;
+  }
+  wrap.classList.remove('hidden');
+  emptyEl?.classList.add('hidden');
+
+  const canvas = document.getElementById('insights-mood-canvas');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  if (_insightsMoodChart) { _insightsMoodChart.destroy(); _insightsMoodChart = null; }
+
+  const cs          = getComputedStyle(document.documentElement);
+  const borderClr   = cs.getPropertyValue('--border').trim()      || '#cde5d8';
+  const textMuted   = cs.getPropertyValue('--text-muted').trim()  || '#587568';
+
+  _insightsMoodChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Mood',
+        data: scores,
+        backgroundColor: scores.map(s =>
+          s === null ? 'transparent' : `rgba(29,158,117,${0.2 + (s / 5) * 0.65})`),
+        borderColor: scores.map(s => s === null ? 'transparent' : '#1D9E75'),
+        borderWidth: 2,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label(ctx) {
+              return ['','😞 Awful','😐 Meh','🙂 Okay','😊 Good','🤩 Great'][ctx.raw] || '—';
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          min: 0, max: 5,
+          ticks: {
+            stepSize: 1, color: textMuted, font: { size: 11 },
+            callback: v => ['','😞','😐','🙂','😊','🤩'][v] || ''
+          },
+          grid: { color: borderClr }
+        },
+        x: { ticks: { color: textMuted, font: { size: 11 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+async function loadWeeklySummary() {
+  const loaderEl   = document.getElementById('insight-loader');
+  const entriesEl  = document.getElementById('weekly-stat-entries');
+  const wordsEl    = document.getElementById('weekly-stat-words');
+  const moodEl     = document.getElementById('weekly-stat-mood');
+  const textEl     = document.getElementById('insight-text');
+  if (!loaderEl) return;
+  loaderEl.classList.remove('hidden');
+  try {
+    const data = await api('GET', '/api/insights/weekly-summary');
+    if (!data) return;
+    if (entriesEl) entriesEl.textContent = data.stats?.entries ?? '—';
+    if (wordsEl)   wordsEl.textContent   = data.stats?.words   ?? '—';
+    const EM = { awful: '😞', meh: '😐', okay: '🙂', good: '😊', great: '🤩' };
+    if (moodEl)  moodEl.textContent  = data.stats?.topMood ? (EM[data.stats.topMood] || data.stats.topMood) : '—';
+    if (textEl) {
+      textEl.textContent = data.aiInsight || 'Write more entries this week to get your AI insight.';
+      textEl.classList.toggle('placeholder-text', !data.aiInsight);
+    }
+  } catch (e) { console.warn('[loadWeeklySummary]', e.message); }
+  finally { loaderEl.classList.add('hidden'); }
+}
+
+async function handleInsightsExport() {
+  const btn     = document.getElementById('insights-export-btn');
+  const spinner = document.getElementById('insights-export-spinner');
+  if (btn) btn.disabled = true;
+  if (spinner) spinner.classList.remove('hidden');
+  try {
+    const token = localStorage.getItem('reflectai_token');
+    const res   = await fetch('/api/export/pdf', {
+      method: 'POST', headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      showToast(d.error || 'Export failed.');
+      return;
+    }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const dateStr  = new Date().toISOString().slice(0, 10);
+    const username = (state.user?.email || 'journal').split('@')[0].replace(/[^a-zA-Z0-9_-]/g, '_');
+    a.href = url; a.download = 'ReflectAI-Journal-' + username + '-' + dateStr + '.pdf';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+    showToast('Journal exported!');
+  } catch { showToast('Export failed. Please try again.'); }
+  finally {
+    if (btn) btn.disabled = false;
+    if (spinner) spinner.classList.add('hidden');
+  }
+}
+
+
+/* ================================================================
+   29. GOALS TAB — progress, category, confetti, completed section
+================================================================ */
+async function adjustGoalProgress(id, delta) {
+  const goal = state.goals.find(g => g.id === id);
+  if (!goal) return;
+  const newProg = Math.min(100, Math.max(0, (goal.progress || 0) + delta * 10));
+  try {
+    await api('PATCH', '/api/goals/' + id, { progress: newProg });
+    goal.progress = newProg;
+    renderGoals();
+  } catch (e) { showToast('Could not update: ' + e.message); }
+}
+
+function triggerConfetti(x, y) {
+  const colors = ['#1D9E75','#5dbf8a','#E1F5EE','#fbbf24','#f87171','#60a5fa','#a78bfa'];
+  for (let i = 0; i < 20; i++) {
+    const el    = document.createElement('div');
+    el.className = 'confetti-piece';
+    const angle = (i / 20) * 360;
+    const dist  = 55 + Math.random() * 90;
+    const cx    = (Math.cos(angle * Math.PI / 180) * dist).toFixed(1) + 'px';
+    const cy    = (Math.sin(angle * Math.PI / 180) * dist - 40).toFixed(1) + 'px';
+    const cr    = Math.round(Math.random() * 360) + 'deg';
+    el.style.cssText = `left:${x}px;top:${y}px;background:${colors[i%colors.length]};--cx:${cx};--cy:${cy};--cr:${cr}`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1000);
+  }
+}
+
+async function toggleGoalStatusWithConfetti(id, event) {
+  const goal = state.goals.find(g => g.id === id);
+  if (!goal) return;
+  const newStatus = goal.status === 'completed' ? 'active' : 'completed';
+  try {
+    await api('PATCH', '/api/goals/' + id, { status: newStatus });
+    goal.status = newStatus;
+    if (newStatus === 'completed' && event) {
+      const r = event.target.getBoundingClientRect();
+      triggerConfetti(r.left + r.width / 2, r.top + r.height / 2);
+      const card = document.getElementById('goal-card-' + id);
+      if (card) { card.classList.add('just-completed'); setTimeout(() => card.classList.remove('just-completed'), 800); }
+    }
+    renderGoals();
+    renderHomeGoalsSnapshot();
+  } catch (e) { showToast('Could not update goal: ' + e.message); }
+}
+
+function toggleCompletedGoals() {
+  const list = document.getElementById('completed-goals-list');
+  const btn  = document.getElementById('completed-toggle-btn');
+  if (!list || !btn) return;
+  const showing = !list.classList.contains('hidden');
+  list.classList.toggle('hidden', showing);
+  const count = state.goals.filter(g => g.status === 'completed').length;
+  btn.textContent = (showing ? 'Show' : 'Hide') + ' completed (' + count + ')';
+}
+
+function renderGoalCard(container, goal) {
+  const isDone    = goal.status === 'completed';
+  const catBadge  = goal.category
+    ? `<span class="goal-cat-badge goal-cat-${escapeHTML(goal.category)}">${escapeHTML(goal.category)}</span>`
+    : '';
+  const dateStr   = goal.targetDate ? formatTargetDate(goal.targetDate) : null;
+  const progress  = goal.progress || 0;
+
+  const card = document.createElement('div');
+  card.className  = 'goal-card' + (isDone ? ' goal-done' : '');
+  card.id         = 'goal-card-' + goal.id;
+  card.innerHTML  = `
+    <div class="goal-card-header">
+      <div class="goal-card-info">
+        <h3 class="goal-title-text">${escapeHTML(goal.title)}</h3>
+        ${goal.description ? `<p class="goal-desc-text">${escapeHTML(goal.description)}</p>` : ''}
+        <div class="goal-meta-row">
+          ${catBadge}
+          ${dateStr ? `<span class="goal-date-text">${escapeHTML(dateStr)}</span>` : ''}
+        </div>
+        ${!isDone ? `
+        <div class="goal-progress-wrap">
+          <div class="goal-progress-header">
+            <span class="goal-progress-pct">${progress}%</span>
+            <div class="goal-progress-controls">
+              <button class="goal-progress-btn" onclick="adjustGoalProgress('${goal.id}',-1)" title="−10%">−</button>
+              <button class="goal-progress-btn" onclick="adjustGoalProgress('${goal.id}',1)"  title="+10%">+</button>
+            </div>
+          </div>
+          <div class="goal-progress-track">
+            <div class="goal-progress-fill" style="width:${progress}%"></div>
+          </div>
+        </div>` : ''}
+      </div>
+      <div class="goal-card-actions">
+        <button class="btn btn-sm ${isDone ? 'btn-ghost' : 'btn-secondary'}"
+          onclick="toggleGoalStatusWithConfetti('${goal.id}',event)">
+          ${isDone ? 'Reopen' : '✓ Complete'}
+        </button>
+        ${!isDone ? `<button class="btn btn-sm btn-secondary" id="checkin-btn-${goal.id}" onclick="goalCheckin('${goal.id}')">🤖 Check in</button>` : ''}
+        <button class="btn btn-sm btn-ghost-danger" onclick="deleteGoal('${goal.id}')">🗑</button>
+      </div>
+    </div>
+    <div class="goal-checkin-result hidden" id="checkin-out-${goal.id}"></div>`;
+  container.appendChild(card);
+}
+
+
+/* ================================================================
+   30. PROFILE TAB
+================================================================ */
+function updateProfileUI(user) {
+  if (!user) return;
+  const isPro = user.plan === 'pro';
+
+  const parts    = user.email.split('@')[0].replace(/[._-]+/g, ' ').split(' ').filter(Boolean);
+  const initials = parts.map(w => (w[0] || '').toUpperCase()).slice(0, 2).join('') || '?';
+  const avatarEl = document.getElementById('profile-avatar');
+  if (avatarEl) avatarEl.textContent = initials;
+
+  const emailEl = document.getElementById('profile-email-display');
+  if (emailEl) emailEl.textContent = user.email;
+
+  const badgeEl = document.getElementById('profile-plan-badge');
+  if (badgeEl) { badgeEl.textContent = isPro ? 'PRO' : 'FREE'; badgeEl.classList.toggle('pro', isPro); }
+
+  const sinceEl = document.getElementById('profile-member-since');
+  if (sinceEl && user.createdAt) {
+    sinceEl.textContent = 'Since ' + new Date(user.createdAt)
+      .toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  }
+
+  document.getElementById('profile-upgrade-banner')?.classList.toggle('hidden', isPro);
+
+  const billingEl   = document.getElementById('profile-billing-section');
+  const billingText = document.getElementById('profile-billing-text');
+  if (billingEl && billingText) {
+    if (isPro && user.subscriptionExpiry) {
+      const expStr = new Date(user.subscriptionExpiry)
+        .toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      billingText.textContent = user.subscriptionStatus === 'non-renewing'
+        ? `Active until ${expStr} · Will not renew`
+        : `Renews ${expStr}`;
+      billingEl.classList.remove('hidden');
+    } else {
+      billingEl.classList.add('hidden');
+    }
+  }
+}
+
+function renderProfileStats() {
+  const entriesEl = document.getElementById('profile-stat-entries');
+  const wordsEl   = document.getElementById('profile-stat-words');
+  const daysEl    = document.getElementById('profile-stat-days');
+  const streakEl  = document.getElementById('profile-stat-streak');
+  if (!entriesEl) return;
+
+  entriesEl.textContent = state.entries.length;
+  const totalWords = state.entries.reduce(
+    (s, e) => s + (e.text ? e.text.trim().split(/\s+/).filter(Boolean).length : 0), 0
+  );
+  wordsEl.textContent = totalWords > 9999 ? Math.round(totalWords / 1000) + 'k' : totalWords;
+  daysEl.textContent  = new Set(state.entries.map(e => e.date)).size;
+  streakEl.textContent = state.streak;
+}
+
+function toggleChangePassword() {
+  const form  = document.getElementById('change-password-form');
+  const arrow = document.getElementById('cp-arrow');
+  if (!form) return;
+  const open = form.classList.contains('hidden');
+  form.classList.toggle('hidden', !open);
+  if (arrow) arrow.textContent = open ? '∨' : '›';
+  if (!open) {
+    ['cp-current','cp-new','cp-confirm'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    document.getElementById('cp-error')?.classList.add('hidden');
+  }
+}
+
+async function submitChangePassword() {
+  const currentPw = document.getElementById('cp-current')?.value || '';
+  const newPw     = document.getElementById('cp-new')?.value     || '';
+  const confirmPw = document.getElementById('cp-confirm')?.value || '';
+  const errEl     = document.getElementById('cp-error');
+  if (errEl) errEl.classList.add('hidden');
+
+  if (!currentPw || !newPw || !confirmPw) {
+    if (errEl) { errEl.textContent = 'All fields are required.'; errEl.classList.remove('hidden'); } return;
+  }
+  if (newPw !== confirmPw) {
+    if (errEl) { errEl.textContent = 'New passwords do not match.'; errEl.classList.remove('hidden'); } return;
+  }
+  if (newPw.length < 8) {
+    if (errEl) { errEl.textContent = 'New password must be at least 8 characters.'; errEl.classList.remove('hidden'); } return;
+  }
+
+  try {
+    await api('POST', '/api/auth/change-password', { currentPassword: currentPw, newPassword: newPw });
+    showToast('Password updated successfully!');
+    toggleChangePassword();
+  } catch (e) {
+    if (errEl) { errEl.textContent = e.message || 'Could not update password.'; errEl.classList.remove('hidden'); }
+  }
+}
+
+
+/* ================================================================
    24. BOOT
 ================================================================ */
 document.addEventListener('DOMContentLoaded', async () => {
   captureReferralCode();
   initTheme();
   initApp();
-  initScrollReveal();
   initAutoResize(document.getElementById('journal-input'));
   await loadConfig();
   await initAuth();
@@ -2117,7 +2647,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   maybeShowPwaBanner();
 });
 
+// Handle keyboard hiding bottom nav when textarea is focused
+document.addEventListener('DOMContentLoaded', () => {
+  const ta  = document.getElementById('journal-input');
+  const nav = document.getElementById('bottom-nav');
+  if (!ta || !nav) return;
+  ta.addEventListener('focus', () => {
+    if (window.innerWidth <= 768) nav.style.transform = 'translateY(100%)';
+  });
+  ta.addEventListener('blur', () => {
+    nav.style.transform = '';
+  });
+});
+
 window.addEventListener('resize', () => {
-  const moodEntries = state.entries.filter(e => e.mood);
-  if (moodEntries.length) drawMoodChart(document.getElementById('mood-chart-canvas'), [...moodEntries].reverse().slice(-21));
+  // Redraw insights chart on resize (if visible)
+  if (_insightsMoodChart) {
+    _insightsMoodChart.resize();
+  }
 });

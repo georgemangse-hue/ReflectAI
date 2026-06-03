@@ -2,18 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>ReflectAI – Your Daily Journal</title>
   <meta name="description" content="A private AI journaling app for students and young professionals." />
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="tab-styles.css" />
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#3a8f65" />
-  <!-- iOS / Safari PWA -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="ReflectAI" />
   <link rel="apple-touch-icon" href="/icons/icon.svg" />
-  <!-- Apply saved theme before first paint to prevent flash -->
   <script>
     (function () {
       var saved = localStorage.getItem('reflectai_theme');
@@ -21,12 +20,13 @@
       document.documentElement.setAttribute('data-theme', saved || (prefersDark ? 'dark' : 'light'));
     })();
   </script>
+  <!-- Chart.js for Insights mood graph -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
   <!-- =============================================================
        AUTH OVERLAY
-       Covers the full page when the user is not logged in.
   ============================================================== -->
   <div id="auth-overlay" class="auth-overlay" aria-modal="true" role="dialog" aria-label="Sign in to ReflectAI">
     <div class="auth-card">
@@ -104,7 +104,6 @@
 
   <!-- =============================================================
        PAYMENT WALL
-       Shown after login when user hasn't paid yet.
   ============================================================== -->
   <div id="payment-wall" class="auth-overlay hidden" aria-modal="true" role="dialog" aria-label="Unlock ReflectAI">
     <div class="auth-card payment-card">
@@ -148,7 +147,6 @@
 
   <!-- =============================================================
        UPGRADE MODAL
-       Shown when a free user taps a Pro-gated feature.
   ============================================================== -->
   <div id="upgrade-modal" class="modal-overlay hidden" aria-modal="true" role="dialog" aria-label="Upgrade to Pro">
     <div class="modal-card">
@@ -166,11 +164,8 @@
       </ul>
 
       <button class="btn btn-primary upgrade-cta" id="upgrade-btn" onclick="handleUpgrade()">
-        Upgrade Now — $9 / month
+        Upgrade Now
       </button>
-      <p class="upgrade-demo-note">
-        Demo mode: clicking "Upgrade Now" simulates a Pro upgrade — no payment required.
-      </p>
     </div>
   </div>
 
@@ -320,131 +315,91 @@
 
 
   <!-- =============================================================
-       NAVIGATION
+       PAST ENTRY MODAL (read-only view from Journal history strip)
   ============================================================== -->
-  <nav>
-    <div class="container nav-inner">
-
-      <a href="#hero" class="logo" aria-label="ReflectAI home">
-        🌿 <span class="logo-word">Reflect<strong>AI</strong></span>
-      </a>
-
-      <div class="nav-links" role="navigation" aria-label="Page sections">
-        <a href="#journal-section">Journal</a>
-        <a href="#weekly-section">Weekly</a>
-        <a href="#goals-section">Goals</a>
-        <a href="#history-section">History</a>
-      </div>
-
-      <div class="nav-right">
-        <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" aria-label="Switch to dark mode" title="Toggle dark mode">
-          <span class="theme-icon" aria-hidden="true">🌙</span>
-        </button>
-
-        <!-- Shown after login -->
-        <div class="nav-user hidden" id="nav-user">
-          <span class="plan-badge" id="nav-plan-badge">FREE</span>
-          <div class="account-dropdown-wrap" id="account-dropdown-wrap">
-            <button class="nav-account-btn" id="account-dropdown-trigger" onclick="toggleAccountDropdown()" aria-haspopup="true" aria-expanded="false">
-              👤 My Account
-            </button>
-            <div class="account-dropdown hidden" id="account-dropdown" role="menu">
-              <div class="dropdown-user-info">
-                <p class="dropdown-email" id="dropdown-email"></p>
-                <div class="dropdown-plan-row">
-                  <span class="plan-badge" id="dropdown-plan-badge">FREE</span>
-                  <span class="dropdown-plan-label" id="dropdown-plan-label">Free plan</span>
-                </div>
-                <p class="dropdown-renewal hidden" id="dropdown-renewal"></p>
-              </div>
-              <div class="dropdown-divider"></div>
-              <p class="dropdown-referral-credit hidden" id="dropdown-referral-credit"></p>
-              <div class="dropdown-actions">
-                <button class="dropdown-btn" id="dropdown-upgrade-btn" onclick="showUpgradeModal();closeAccountDropdown()">⬆ Upgrade to Pro</button>
-                <a class="dropdown-btn" href="/referral.html" id="dropdown-referral-btn">🎁 Invite a friend</a>
-                <button class="dropdown-btn dropdown-btn-danger hidden" id="dropdown-cancel-btn" onclick="cancelSubscription()">Cancel Subscription</button>
-                <button class="dropdown-btn hidden" id="dropdown-resub-btn" onclick="openPaystack();closeAccountDropdown()">↩ Resubscribe</button>
-                <button class="dropdown-btn" id="dropdown-export-btn" onclick="exportJournal();closeAccountDropdown()">📤 Export Journal (PDF)</button>
-                <button class="dropdown-btn" onclick="showFeedbackModal();closeAccountDropdown()">💬 Share Feedback</button>
-                <button class="dropdown-btn dropdown-btn-logout" onclick="handleLogout()">Log out</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
+  <div id="past-entry-modal" class="modal-overlay hidden" aria-modal="true" role="dialog"
+       onclick="if(event.target===this)closePastEntryModal()">
+    <div class="modal-card past-entry-card">
+      <button class="modal-close" onclick="closePastEntryModal()" aria-label="Close">✕</button>
+      <div class="past-entry-date-header" id="past-entry-modal-date"></div>
+      <div class="past-entry-mood-line" id="past-entry-modal-mood"></div>
+      <div class="past-entry-body" id="past-entry-modal-body"></div>
     </div>
-  </nav>
+  </div>
 
 
   <!-- =============================================================
-       HERO
+       HIDDEN BACKWARD-COMPAT ELEMENTS
+       Keep these IDs alive so existing JS functions (applyUserUI,
+       applySubscriptionUI, loadReferralStats) work without changes.
   ============================================================== -->
-  <section id="hero" aria-label="Introduction">
-    <div class="container">
-      <div class="hero-eyebrow">🌱 Your personal journaling companion</div>
-      <h1>Your daily space to<br /><em>reflect &amp; grow</em></h1>
-      <div class="hero-social-proof">
-        <div class="social-avatars" aria-hidden="true">
-          <span class="avatar av-1">A</span>
-          <span class="avatar av-2">T</span>
-          <span class="avatar av-3">K</span>
-          <span class="avatar av-4">M</span>
+  <div class="hidden" aria-hidden="true">
+    <div id="nav-user">
+      <span class="plan-badge" id="nav-plan-badge">FREE</span>
+      <div id="account-dropdown-wrap">
+        <button id="account-dropdown-trigger"></button>
+        <div id="account-dropdown">
+          <p id="dropdown-email"></p>
+          <span class="plan-badge" id="dropdown-plan-badge">FREE</span>
+          <span id="dropdown-plan-label">Free plan</span>
+          <p id="dropdown-renewal"></p>
+          <p id="dropdown-referral-credit"></p>
+          <button id="dropdown-upgrade-btn" onclick="showUpgradeModal()">Upgrade to Pro</button>
+          <button id="dropdown-cancel-btn" onclick="cancelSubscription()">Cancel Subscription</button>
+          <button id="dropdown-resub-btn" onclick="openPaystack()">Resubscribe</button>
+          <button id="dropdown-export-btn" onclick="exportJournal()">Export Journal (PDF)</button>
         </div>
-        <p class="social-proof-text">Built for <strong>students and young professionals</strong> who want to grow daily.</p>
-      </div>
-      <p class="hero-tagline">
-        Write freely. Let AI transform your words into personalised
-        reflection prompts, weekly insights, and a story of your progress.
-      </p>
-      <div class="hero-cta-group">
-        <button class="btn btn-primary btn-hero" id="hero-cta-btn" onclick="handleHeroCta()">
-          Start Journaling Free →
-        </button>
-        <p class="hero-cta-sub">Cancel anytime · No contracts · Billed monthly via Paystack</p>
-      </div>
-      <div class="hero-features" role="list">
-        <span class="badge" role="listitem">✦ AI Reflection Prompts</span>
-        <span class="badge" role="listitem">📊 Weekly Insights</span>
-        <span class="badge" role="listitem">🎯 Goal Tracking</span>
-        <span class="badge" role="listitem">🔒 Private &amp; Secure</span>
       </div>
     </div>
-  </section>
+    <!-- Hidden mood section keeps renderMoodSection() happy -->
+    <section id="mood-section">
+      <canvas id="mood-chart-canvas"></canvas>
+      <div id="mood-frequency"></div>
+    </section>
+    <!-- Hidden streak widget (legacy renderStreak uses these IDs — real ones are in Home tab) -->
+    <div id="streak-widget-legacy">
+      <span id="streak-number-legacy">0</span>
+      <p id="streak-message-legacy"></p>
+    </div>
+  </div>
 
 
   <!-- =============================================================
-       MOOD TREND SECTION  (hidden until entries with mood exist)
+       APP HEADER (top bar — logo + theme toggle)
   ============================================================== -->
-  <section id="mood-section" class="main-section hidden" aria-label="Mood trends">
-    <div class="container">
-      <div class="section-header reveal">
-        <span class="section-label">Insights</span>
-        <h2>Mood Trends</h2>
-        <p class="text-muted">How your emotional state has shifted across your recent entries.</p>
-      </div>
-      <div class="mood-chart-card reveal reveal-delay-1">
-        <canvas id="mood-chart-canvas" class="mood-chart-canvas" role="img" aria-label="Mood trend line chart"></canvas>
-        <div id="mood-frequency" class="mood-frequency" aria-label="Mood breakdown"></div>
-      </div>
+  <header class="app-header">
+    <div class="header-inner">
+      <span class="app-logo">🌿 <strong>Reflect</strong>AI</span>
+      <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">
+        <span class="theme-icon" aria-hidden="true">🌙</span>
+      </button>
     </div>
-  </section>
+  </header>
 
 
   <!-- =============================================================
-       JOURNAL SECTION
+       MAIN TAB CONTENT
   ============================================================== -->
-  <section id="journal-section" class="main-section" aria-label="Write today's journal entry">
-    <div class="container">
+  <main class="tab-main" id="tab-main">
 
-      <div class="journal-top reveal">
-        <div class="section-header">
-          <span class="section-label">Step 1</span>
-          <h2>Today's Entry</h2>
-          <p class="text-muted">Write anything on your mind — thoughts, wins, challenges, feelings.</p>
+    <!-- =========================================================
+         TAB 1 — HOME
+    ========================================================== -->
+    <div id="tab-home" class="tab-pane" role="tabpanel" aria-label="Home">
+      <div class="tab-scroll">
+
+        <div class="home-greeting-block">
+          <div class="home-greeting" id="home-greeting">Good morning 🌿</div>
+          <div class="home-date" id="home-date"></div>
         </div>
 
-        <!-- Streak widget -->
+        <!-- Daily quote -->
+        <div class="home-quote-card">
+          <div class="home-quote-text" id="home-quote-text"></div>
+          <div class="home-quote-source" id="home-quote-source"></div>
+        </div>
+
+        <!-- Streak -->
         <div class="streak-widget" id="streak-widget" aria-label="Writing streak">
           <div class="streak-flame" aria-hidden="true">🔥</div>
           <div class="streak-info">
@@ -455,13 +410,55 @@
             <p class="streak-message" id="streak-message">Start your streak today!</p>
           </div>
         </div>
+
+        <!-- Quick mood check-in -->
+        <div class="home-mood-card" id="home-mood-card">
+          <p class="home-mood-label">How are you feeling today?</p>
+          <div class="home-mood-row" id="home-mood-row">
+            <button class="quick-mood-btn" data-qmood="awful"  onclick="logQuickMood('awful')"  aria-label="Awful">😞</button>
+            <button class="quick-mood-btn" data-qmood="meh"    onclick="logQuickMood('meh')"    aria-label="Meh">😐</button>
+            <button class="quick-mood-btn" data-qmood="okay"   onclick="logQuickMood('okay')"   aria-label="Okay">🙂</button>
+            <button class="quick-mood-btn" data-qmood="good"   onclick="logQuickMood('good')"   aria-label="Good">😊</button>
+            <button class="quick-mood-btn" data-qmood="great"  onclick="logQuickMood('great')"  aria-label="Great">🤩</button>
+          </div>
+          <p class="home-mood-logged hidden" id="home-mood-logged"></p>
+        </div>
+
+        <!-- Start reflection CTA -->
+        <button class="btn btn-primary home-reflect-btn" onclick="switchTab('journal')">
+          Start Today's Reflection →
+        </button>
+
+        <!-- Goals snapshot -->
+        <div class="home-goals-snap">
+          <div class="home-goals-snap-header">
+            <span class="home-section-label">Active Goals</span>
+            <button class="home-link-btn" onclick="switchTab('goals')">View all →</button>
+          </div>
+          <div id="home-goals-list">
+            <div class="home-goals-empty" id="home-goals-empty">
+              <button class="home-link-btn" onclick="switchTab('goals')">Set your first goal →</button>
+            </div>
+          </div>
+        </div>
+
       </div>
+    </div>
 
-      <p id="today-date" aria-live="polite"></p>
 
-      <form id="journal-form" novalidate class="reveal reveal-delay-1">
+    <!-- =========================================================
+         TAB 2 — JOURNAL
+    ========================================================== -->
+    <div id="tab-journal" class="tab-pane hidden" role="tabpanel" aria-label="Journal">
+      <div class="tab-scroll">
 
-        <!-- Mood selector -->
+        <!-- Recent entries strip (last 3 as tappable chips) -->
+        <div class="entry-strip" id="entry-strip" aria-label="Recent entries"></div>
+
+        <!-- Date label -->
+        <p id="today-date" class="journal-date-label" aria-live="polite"></p>
+
+        <!-- 7-mood selector -->
         <div class="mood-selector" role="group" aria-label="How are you feeling today?">
           <span class="mood-selector-label">How are you feeling?</span>
           <div class="mood-options">
@@ -489,207 +486,356 @@
           </div>
         </div>
 
-        <textarea
-          id="journal-input"
-          class="journal-textarea"
-          placeholder="How was your day? What's on your mind? Write freely — there are no rules here…"
-          maxlength="3000"
-          aria-label="Journal entry textarea"
-          aria-required="true"
-        ></textarea>
-        <div class="form-footer">
-          <div class="form-footer-left">
-            <span id="char-count" aria-live="polite">0 words</span>
-            <button type="button" class="btn-save-draft" onclick="saveDraft()" title="Save your draft so it survives a closed tab">Save draft</button>
-            <span id="draft-indicator" class="draft-indicator" aria-live="polite"></span>
+        <form id="journal-form" novalidate>
+          <textarea
+            id="journal-input"
+            class="journal-textarea"
+            placeholder="What's on your mind today? Write freely…"
+            maxlength="3000"
+            aria-label="Journal entry textarea"
+            aria-required="true"
+          ></textarea>
+          <div class="form-footer">
+            <div class="form-footer-left">
+              <span id="char-count" aria-live="polite">0 words</span>
+              <button type="button" class="btn-save-draft" onclick="saveDraft()" title="Save draft">Save draft</button>
+              <span id="draft-indicator" class="draft-indicator" aria-live="polite"></span>
+            </div>
+            <button type="submit" class="btn btn-primary" id="submit-btn">Save &amp; Reflect →</button>
           </div>
-          <button type="submit" class="btn btn-primary" id="submit-btn">Get Reflection Prompts &rarr;</button>
-        </div>
-        <p id="free-entry-counter" class="free-entry-counter hidden" aria-live="polite"></p>
-      </form>
+          <p id="free-entry-counter" class="free-entry-counter hidden" aria-live="polite"></p>
+        </form>
 
-      <div id="prompts-section" class="hidden" aria-live="polite" aria-label="AI reflection prompts">
-        <p class="prompts-heading">✦ Your Personalised Prompts</p>
-        <div id="prompts-loader" class="loader hidden" role="status">
-          <div class="spinner" aria-hidden="true"></div>
-          Thinking about your entry…
+        <!-- AI reflection output -->
+        <div id="prompts-section" class="hidden" aria-live="polite" aria-label="AI reflection prompts">
+          <div class="ai-reflection-header">
+            <span class="ai-reflection-label">Your AI Reflection 🌿</span>
+          </div>
+          <div id="prompts-loader" class="loader hidden" role="status">
+            <div class="spinner" aria-hidden="true"></div>
+            Thinking about your entry…
+          </div>
+          <div id="prompts-error" class="error-msg hidden" role="alert"></div>
+          <div id="prompts-result" class="hidden">
+            <div class="prompts-grid" id="prompts-grid"></div>
+          </div>
         </div>
-        <div id="prompts-error" class="error-msg hidden" role="alert"></div>
-        <div id="prompts-result" class="hidden">
-          <div class="prompts-grid" id="prompts-grid"></div>
+
+        <!-- Entry history -->
+        <div class="journal-history-section">
+          <div class="journal-history-header">
+            <h3>Past Entries</h3>
+            <button class="btn btn-sm btn-secondary" id="clear-btn" onclick="confirmClearHistory()" aria-label="Clear all entries">
+              Clear All
+            </button>
+          </div>
+          <div class="history-search-wrap">
+            <input type="search" id="history-search" class="history-search-input"
+              placeholder="Search entries…" oninput="renderHistory()" autocomplete="off" />
+          </div>
+          <div id="history-container" aria-live="polite"></div>
         </div>
+
       </div>
-
     </div>
-  </section>
 
 
-  <!-- =============================================================
-       WEEKLY INSIGHT  (Pro feature)
-  ============================================================== -->
-  <section id="weekly-section" class="main-section" aria-label="Weekly insight summary">
-    <div class="container">
+    <!-- =========================================================
+         TAB 3 — INSIGHTS
+    ========================================================== -->
+    <div id="tab-insights" class="tab-pane hidden" role="tabpanel" aria-label="Insights">
+      <div class="tab-scroll">
 
-      <div class="section-header reveal">
-        <span class="section-label">Preview — Weekly Digest</span>
-        <h2>Weekly Insight</h2>
-        <p class="text-muted">An AI-generated reflection on your past entries — patterns, growth moments, and a suggestion for the week ahead.</p>
-      </div>
+        <h2 class="tab-page-title">Insights</h2>
 
-      <!-- Free-user lock overlay -->
-      <div id="weekly-lock" class="pro-lock hidden reveal reveal-delay-1">
-        <div class="pro-lock-inner">
-          <span class="pro-lock-icon">📊</span>
-          <h3>Weekly Insight is a Pro feature</h3>
-          <p>Upgrade to unlock AI-powered summaries of your journaling patterns each week.</p>
-          <button class="btn btn-primary" onclick="showUpgradeModal()">Upgrade to Pro &rarr;</button>
+        <!-- Section A: Mood graph -->
+        <div class="insights-card">
+          <h3 class="insights-card-title">Mood This Week</h3>
+          <div class="insights-chart-wrap" id="insights-chart-wrap">
+            <canvas id="insights-mood-canvas" aria-label="Mood trend chart"></canvas>
+          </div>
+          <p class="insights-empty-msg hidden" id="insights-mood-empty">
+            Log your mood daily to see your trends here 🌿
+          </p>
         </div>
-      </div>
 
-      <!-- Pro-user content -->
-      <div id="weekly-content" class="hidden">
-        <p id="weekly-trial-note" class="free-entry-counter hidden">✦ Free preview — 1 weekly insight included · Subscribe for unlimited</p>
-        <div class="insight-card reveal reveal-delay-1">
+        <!-- Section B: Weekly summary -->
+        <div class="insights-card" id="weekly-content">
+          <h3 class="insights-card-title">Your week in summary</h3>
           <div id="insight-loader" class="loader hidden" role="status">
             <div class="spinner" aria-hidden="true"></div>
             Analysing your recent entries…
           </div>
           <div id="insight-error" class="error-msg hidden" role="alert"></div>
-          <p id="insight-text" class="placeholder-text" aria-live="polite">
-            Click "Generate Insight" below to receive a personalised weekly summary based on your recent entries.
+          <div class="weekly-stats-row" id="weekly-stats-row">
+            <div class="weekly-stat">
+              <span class="weekly-stat-num" id="weekly-stat-entries">—</span>
+              <span class="weekly-stat-label">entries</span>
+            </div>
+            <div class="weekly-stat">
+              <span class="weekly-stat-num" id="weekly-stat-words">—</span>
+              <span class="weekly-stat-label">words</span>
+            </div>
+            <div class="weekly-stat">
+              <span class="weekly-stat-num" id="weekly-stat-mood">—</span>
+              <span class="weekly-stat-label">top mood</span>
+            </div>
+          </div>
+          <p id="insight-text" class="insight-text placeholder-text" aria-live="polite">
+            Load your weekly summary to see your AI insight.
           </p>
           <div class="insight-footer">
             <span id="insight-meta" class="insight-meta">Based on your last 7 entries</span>
-            <button class="btn btn-secondary" id="generate-insight-btn" onclick="generateWeeklyInsight()">Generate Insight</button>
+            <button class="btn btn-secondary btn-sm" id="generate-insight-btn" onclick="generateWeeklyInsight()">Generate Insight</button>
+          </div>
+          <p id="weekly-trial-note" class="free-entry-counter hidden" aria-live="polite"></p>
+        </div>
+
+        <!-- Section C: Export -->
+        <div class="insights-card">
+          <h3 class="insights-card-title">Take your journal with you</h3>
+          <p class="insights-export-desc">Download all your entries, reflections and mood history as a beautifully formatted PDF.</p>
+          <div id="export-pro-section" class="hidden">
+            <button class="btn btn-primary" id="insights-export-btn" onclick="handleInsightsExport()">
+              <span id="insights-export-spinner" class="spinner hidden" style="width:16px;height:16px;margin-right:6px;border-width:2px"></span>
+              Export as PDF
+            </button>
+          </div>
+          <div id="export-free-section" class="hidden">
+            <button class="btn btn-secondary" disabled style="opacity:0.5;cursor:not-allowed">Export as PDF</button>
+            <p class="export-locked-msg">Upgrade to Pro to export your journal</p>
           </div>
         </div>
-      </div>
 
+      </div>
     </div>
-  </section>
 
 
-  <!-- =============================================================
-       GOALS  (Pro feature)
-  ============================================================== -->
-  <section id="goals-section" class="main-section" aria-label="Goal setting and tracking">
-    <div class="container">
+    <!-- =========================================================
+         TAB 4 — GOALS
+    ========================================================== -->
+    <div id="tab-goals" class="tab-pane hidden" role="tabpanel" aria-label="Goals">
+      <div class="tab-scroll">
 
-      <div class="section-header reveal">
-        <span class="section-label">Preview — Goals</span>
-        <h2>Goals &amp; Tracking</h2>
-        <p class="text-muted">Set meaningful goals and let your journal check in on your progress.</p>
-      </div>
+        <h2 class="tab-page-title">Goals</h2>
 
-      <!-- Free-user lock -->
-      <div id="goals-lock" class="pro-lock hidden reveal reveal-delay-1">
-        <div class="pro-lock-inner">
-          <span class="pro-lock-icon">🎯</span>
-          <h3>Goal Tracking is a Pro feature</h3>
-          <p>Upgrade to set goals, track progress, and get AI check-ins drawn from your journal entries.</p>
-          <button class="btn btn-primary" onclick="showUpgradeModal()">Upgrade to Pro &rarr;</button>
+        <!-- Free-user lock -->
+        <div id="goals-lock" class="pro-lock hidden">
+          <div class="pro-lock-inner">
+            <span class="pro-lock-icon">🎯</span>
+            <h3>Goal Tracking is a Pro feature</h3>
+            <p>Upgrade to set goals, track progress, and get AI check-ins drawn from your journal entries.</p>
+            <button class="btn btn-primary" onclick="showUpgradeModal()">Upgrade to Pro →</button>
+          </div>
         </div>
-      </div>
 
-      <!-- Pro-user content -->
-      <div id="goals-content" class="hidden">
+        <!-- Pro content -->
+        <div id="goals-content" class="hidden">
 
-        <form id="goal-form" class="goal-form reveal" onsubmit="handleAddGoal(event)" novalidate>
-          <div class="goal-form-row">
-            <input
-              type="text"
-              id="goal-title"
-              class="goal-input"
-              placeholder="What do you want to achieve? e.g. Read 12 books this year"
-              maxlength="100"
-              aria-label="Goal title"
-            />
-            <input
-              type="date"
-              id="goal-target-date"
-              class="goal-input goal-date-input"
-              aria-label="Target date (optional)"
-            />
+          <form id="goal-form" class="goal-form" onsubmit="handleAddGoal(event)" novalidate>
+            <div class="form-group">
+              <input type="text" id="goal-title" class="goal-input"
+                placeholder="What do you want to achieve? e.g. Read 12 books this year"
+                maxlength="100" aria-label="Goal title" />
+            </div>
+            <div class="goal-form-row">
+              <input type="date" id="goal-target-date" class="goal-input goal-date-input" aria-label="Target date (optional)" />
+              <select id="goal-category" class="goal-input goal-category-select" aria-label="Category">
+                <option value="">Category…</option>
+                <option value="Personal">Personal</option>
+                <option value="Career">Career</option>
+                <option value="Health">Health</option>
+                <option value="Learning">Learning</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
             <button type="submit" class="btn btn-primary" id="add-goal-btn">Add Goal</button>
+          </form>
+
+          <p id="goals-trial-note" class="free-entry-counter hidden" aria-live="polite"></p>
+
+          <!-- Active goals -->
+          <div id="goals-list" class="goals-list" aria-live="polite"></div>
+
+          <!-- Completed goals (collapsed by default) -->
+          <div id="completed-goals-section" class="hidden">
+            <button class="completed-toggle-btn" id="completed-toggle-btn" onclick="toggleCompletedGoals()">
+              Show completed (<span id="completed-count">0</span>)
+            </button>
+            <div id="completed-goals-list" class="goals-list hidden" aria-live="polite"></div>
           </div>
-          <textarea
-            id="goal-description"
-            class="goal-desc-input"
-            placeholder="Add more detail (optional)…"
-            maxlength="500"
-            rows="2"
-            aria-label="Goal description"
-          ></textarea>
-        </form>
 
-        <p id="goals-trial-note" class="free-entry-counter hidden" aria-live="polite"></p>
-        <div id="goals-list" class="goals-list" aria-live="polite"></div>
-
-      </div>
-
-    </div>
-  </section>
-
-
-  <!-- =============================================================
-       HISTORY
-  ============================================================== -->
-  <section id="history-section" class="main-section" aria-label="Journal entry history">
-    <div class="container">
-      <div class="history-controls section-header reveal">
-        <div>
-          <span class="section-label">Archive</span>
-          <h2>Entry History</h2>
-          <p class="text-muted">All your past entries, stored privately on your account.</p>
         </div>
-        <button class="btn btn-secondary" id="clear-btn" onclick="confirmClearHistory()" style="flex-shrink:0;align-self:flex-start;" aria-label="Clear all entries">
-          Clear All
-        </button>
       </div>
-      <div class="history-search-wrap reveal">
-        <input type="search" id="history-search" class="history-search-input"
-          placeholder="Search entries…" oninput="renderHistory()" autocomplete="off" />
-      </div>
-      <div id="history-container" aria-live="polite"></div>
     </div>
-  </section>
+
+
+    <!-- =========================================================
+         TAB 5 — PROFILE
+    ========================================================== -->
+    <div id="tab-profile" class="tab-pane hidden" role="tabpanel" aria-label="Profile">
+      <div class="tab-scroll">
+
+        <!-- Avatar + user info -->
+        <div class="profile-header">
+          <div class="profile-avatar" id="profile-avatar">?</div>
+          <div class="profile-user-info">
+            <div class="profile-email" id="profile-email-display">—</div>
+            <div class="profile-plan-row">
+              <span class="plan-badge" id="profile-plan-badge">FREE</span>
+              <span class="profile-member-since" id="profile-member-since"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Upgrade banner (free users) -->
+        <div id="profile-upgrade-banner" class="profile-upgrade-banner hidden">
+          <p>Unlock AI tools, goals, insights &amp; PDF export.</p>
+          <button class="btn btn-primary" onclick="showUpgradeModal()">Upgrade to Pro →</button>
+        </div>
+
+        <!-- Stats -->
+        <div class="profile-stats-row">
+          <div class="profile-stat-card">
+            <span class="profile-stat-num" id="profile-stat-entries">0</span>
+            <span class="profile-stat-label">entries</span>
+          </div>
+          <div class="profile-stat-card">
+            <span class="profile-stat-num" id="profile-stat-words">0</span>
+            <span class="profile-stat-label">words</span>
+          </div>
+          <div class="profile-stat-card">
+            <span class="profile-stat-num" id="profile-stat-days">0</span>
+            <span class="profile-stat-label">days active</span>
+          </div>
+          <div class="profile-stat-card">
+            <span class="profile-stat-num" id="profile-stat-streak">0</span>
+            <span class="profile-stat-label">streak</span>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="profile-actions" role="navigation" aria-label="Account actions">
+          <a class="profile-action-row" href="/referral.html">
+            <span class="profile-action-icon">🎁</span>
+            <span class="profile-action-label">Refer a Friend</span>
+            <span class="profile-action-arrow">›</span>
+          </a>
+          <button class="profile-action-row" onclick="toggleChangePassword()">
+            <span class="profile-action-icon">🔑</span>
+            <span class="profile-action-label">Change Password</span>
+            <span class="profile-action-arrow" id="cp-arrow">›</span>
+          </button>
+          <button class="profile-action-row" onclick="showFeedbackModal()">
+            <span class="profile-action-icon">💬</span>
+            <span class="profile-action-label">Give Feedback</span>
+            <span class="profile-action-arrow">›</span>
+          </button>
+          <button class="profile-action-row profile-action-logout" onclick="handleLogout()">
+            <span class="profile-action-icon">↩</span>
+            <span class="profile-action-label">Log Out</span>
+            <span class="profile-action-arrow">›</span>
+          </button>
+        </div>
+
+        <!-- Change password inline form -->
+        <div id="change-password-form" class="change-password-form hidden">
+          <div class="form-group">
+            <label for="cp-current">Current password</label>
+            <input type="password" id="cp-current" placeholder="Current password" autocomplete="current-password" />
+          </div>
+          <div class="form-group">
+            <label for="cp-new">New password</label>
+            <input type="password" id="cp-new" placeholder="At least 8 characters" autocomplete="new-password" />
+          </div>
+          <div class="form-group">
+            <label for="cp-confirm">Confirm new password</label>
+            <input type="password" id="cp-confirm" placeholder="Repeat new password" autocomplete="new-password" />
+          </div>
+          <div id="cp-error" class="error-msg hidden" role="alert"></div>
+          <div class="cp-actions">
+            <button class="btn btn-primary btn-sm" onclick="submitChangePassword()">Update Password</button>
+            <button class="btn btn-ghost btn-sm" onclick="toggleChangePassword()">Cancel</button>
+          </div>
+        </div>
+
+        <!-- Pro billing section -->
+        <div id="profile-billing-section" class="profile-billing-section hidden">
+          <p id="profile-billing-text" class="profile-billing-text"></p>
+          <button class="btn btn-sm btn-ghost profile-cancel-btn" id="profile-cancel-btn" onclick="cancelSubscription()">Cancel Subscription</button>
+        </div>
+
+        <!-- Footer -->
+        <footer class="profile-footer">
+          <p>© 2026 ReflectAI · PremierLEADZ Consulting Ltd</p>
+          <div class="profile-footer-links">
+            <a href="/privacy.html">Privacy Policy</a>
+            <a href="/terms.html">Terms of Service</a>
+          </div>
+        </footer>
+
+      </div>
+    </div>
+
+  </main>
 
 
   <!-- =============================================================
-       MOBILE BOTTOM NAV
+       BOTTOM NAVIGATION BAR (5 tabs, always visible)
   ============================================================== -->
-  <!-- =============================================================
-       FOOTER
-  ============================================================== -->
-  <footer class="site-footer">
-    <div class="container footer-inner">
-      <p>© 2026 ReflectAI. A product of PremierLEADZ Consulting Ltd. All rights reserved.</p>
-      <div class="footer-links">
-        <a href="/privacy.html">Privacy Policy</a>
-        <a href="/terms.html">Terms of Service</a>
-      </div>
-    </div>
-  </footer>
+  <nav class="bottom-nav" id="bottom-nav" role="tablist" aria-label="Main navigation">
 
-  <nav class="mobile-nav" aria-label="Mobile navigation">
-    <div class="mobile-nav-inner">
-      <a href="#journal-section" class="mobile-nav-link">
-        <span class="nav-icon">✍️</span>Journal
-      </a>
-      <a href="#weekly-section" class="mobile-nav-link">
-        <span class="nav-icon">📊</span>Weekly
-      </a>
-      <a href="#goals-section" class="mobile-nav-link">
-        <span class="nav-icon">🎯</span>Goals
-      </a>
-      <button class="mobile-nav-link mobile-nav-feedback" onclick="event.stopPropagation(); toggleAccountDropdown()">
-        <span class="nav-icon">👤</span>Account
-      </button>
-    </div>
+    <button class="bottom-nav-item active" data-tab="home" onclick="switchTab('home')"
+            role="tab" aria-selected="true" aria-label="Home">
+      <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      <span>Home</span>
+    </button>
+
+    <button class="bottom-nav-item" data-tab="journal" onclick="switchTab('journal')"
+            role="tab" aria-selected="false" aria-label="Journal">
+      <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 20h9"/>
+        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+      </svg>
+      <span>Journal</span>
+    </button>
+
+    <button class="bottom-nav-item" data-tab="insights" onclick="switchTab('insights')"
+            role="tab" aria-selected="false" aria-label="Insights">
+      <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="18" y1="20" x2="18" y2="10"/>
+        <line x1="12" y1="20" x2="12" y2="4"/>
+        <line x1="6" y1="20" x2="6" y2="14"/>
+      </svg>
+      <span>Insights</span>
+    </button>
+
+    <button class="bottom-nav-item" data-tab="goals" onclick="switchTab('goals')"
+            role="tab" aria-selected="false" aria-label="Goals">
+      <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <circle cx="12" cy="12" r="6"/>
+        <circle cx="12" cy="12" r="2"/>
+      </svg>
+      <span>Goals</span>
+    </button>
+
+    <button class="bottom-nav-item" data-tab="profile" onclick="switchTab('profile')"
+            role="tab" aria-selected="false" aria-label="Profile">
+      <svg class="nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+      <span>Profile</span>
+    </button>
+
   </nav>
 
 
-  <!-- PWA install banner — shown after engagement when browser supports it -->
+  <!-- PWA install banner -->
   <div id="pwa-banner" class="pwa-banner hidden" role="complementary" aria-label="Install app">
     <div class="pwa-banner-left">
       <span class="pwa-banner-icon" aria-hidden="true">🌿</span>
@@ -704,9 +850,7 @@
     </div>
   </div>
 
-  <!-- Paystack inline JS — loads payment popup. Safe to fail silently (handled in app.js) -->
   <script src="https://js.paystack.co/v1/inline.js"></script>
-  <!-- Flutterwave inline JS — loads payment popup. Safe to fail silently (handled in app.js) -->
   <script src="https://checkout.flutterwave.com/v3.js"></script>
   <script src="app.js"></script>
 

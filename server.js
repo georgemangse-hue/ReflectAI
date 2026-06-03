@@ -144,11 +144,13 @@ const ENTRIES_DIR    = path.join(DATA_DIR, 'entries');
 const GOALS_DIR      = path.join(DATA_DIR, 'goals');
 const FEEDBACK_FILE           = path.join(DATA_DIR, 'feedback.json');
 const FEEDBACK_RESPONSES_FILE = path.join(DATA_DIR, 'feedback_responses.json');
+const MOOD_LOGS_DIR           = path.join(DATA_DIR, 'mood_logs');
+const WEEKLY_INSIGHTS_DIR     = path.join(DATA_DIR, 'weekly_insights');
 
 /* ================================================================
    Bootstrap
 ================================================================ */
-;[DATA_DIR, ENTRIES_DIR, GOALS_DIR].forEach(d => {
+;[DATA_DIR, ENTRIES_DIR, GOALS_DIR, MOOD_LOGS_DIR, WEEKLY_INSIGHTS_DIR].forEach(d => {
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 });
 if (!fs.existsSync(USERS_FILE))    fs.writeFileSync(USERS_FILE,    '[]');
@@ -202,8 +204,12 @@ function readJSON(filePath, fallback = []) {
 function writeJSON(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
 }
-const entriesFile = uid => path.join(ENTRIES_DIR, `${uid}.json`);
-const goalsFile   = uid => path.join(GOALS_DIR,   `${uid}.json`);
+const entriesFile      = uid => path.join(ENTRIES_DIR,      `${uid}.json`);
+const goalsFile        = uid => path.join(GOALS_DIR,        `${uid}.json`);
+const moodLogsFile     = uid => path.join(MOOD_LOGS_DIR,    `${uid}.json`);
+const weeklyInsightFile = uid => path.join(WEEKLY_INSIGHTS_DIR, `${uid}.json`);
+
+const VALID_QUICK_MOODS = ['awful', 'meh', 'okay', 'good', 'great'];
 
 /* ================================================================
    Crypto / auth helpers
@@ -1879,14 +1885,18 @@ Voice: second person only ("you", "your"). Flowing prose, no bullets or headers.
           });
         }
       }
-      const { title, description, targetDate } = await readBody(req);
+      const { title, description, targetDate, category } = await readBody(req);
       if (!title?.trim()) return sendJSON(res, 400, { error: 'Goal title is required.' });
 
+      const VALID_CATEGORIES = ['Personal', 'Career', 'Health', 'Learning', 'Other'];
       const goals = readJSON(goalsFile(user.id));
       const goal  = {
         id: generateId(), title: title.trim().slice(0, 100),
         description: (description || '').trim().slice(0, 500),
-        targetDate: targetDate || null, status: 'active', createdAt: Date.now()
+        targetDate: targetDate || null,
+        category: VALID_CATEGORIES.includes(category) ? category : null,
+        progress: 0,
+        status: 'active', createdAt: Date.now()
       };
       goals.unshift(goal);
       writeJSON(goalsFile(user.id), goals);
@@ -1903,9 +1913,16 @@ Voice: second person only ("you", "your"). Flowing prose, no bullets or headers.
         const goals   = readJSON(goalsFile(user.id));
         const idx     = goals.findIndex(g => g.id === goalId);
         if (idx === -1) return sendJSON(res, 404, { error: 'Goal not found.' });
+        const VALID_CATEGORIES = ['Personal', 'Career', 'Health', 'Learning', 'Other'];
         ['title', 'description', 'targetDate', 'status'].forEach(k => {
           if (updates[k] !== undefined) goals[idx][k] = updates[k];
         });
+        if (updates.category !== undefined)
+          goals[idx].category = VALID_CATEGORIES.includes(updates.category) ? updates.category : null;
+        if (updates.progress !== undefined) {
+          const p = Number(updates.progress);
+          if (!isNaN(p)) goals[idx].progress = Math.min(100, Math.max(0, Math.round(p / 10) * 10));
+        }
         writeJSON(goalsFile(user.id), goals);
         return sendJSON(res, 200, { goal: goals[idx] });
       }
@@ -1950,6 +1967,107 @@ Your check-in should note any specific evidence from the journal entries that re
         updateUser(user.id, { goalCheckinTrialUsed: (user.goalCheckinTrialUsed || 0) + 1 });
       }
       return sendJSON(res, 200, { checkin: result.content[0].text });
+    }
+
+    /* ==============================================================
+       MOOD LOGS (quick 5-emoji check-in from Home tab)
+    ============================================================== */
+    if (method === 'GET' && url === '/api/mood-logs') {
+      const user = requireAuth(req, res);
+      if (!user) return;
+      return sendJSON(res, 200, { logs: readJSON(moodLogsFile(user.id)) });
+    }
+
+    if (method === 'POST' && url === '/api/mood-logs') {
+      const user = requireAuth(req, res);
+      if (!user) return;
+      const { mood } = await readBody(req);
+      if (!VALID_QUICK_MOODS.includes(mood))
+        return sendJSON(res, 400, { error: 'Invalid mood value.' });
+      const today = new Date().toISOString().split('T')[0];
+      const logs  = readJSON(moodLogsFile(user.id));
+      const score = VALID_QUICK_MOODS.indexOf(mood) + 1;
+      const entry = { date: today, mood, score, createdAt: Date.now() };
+      const idx   = logs.findIndex(l => l.date === today);
+      if (idx !== -1) logs[idx] = entry; else logs.unshift(entry);
+      writeJSON(moodLogsFile(user.id), logs);
+      return sendJSON(res, 200, { log: entry });
+    }
+
+    /* ==============================================================
+       WEEKLY INSIGHTS SUMMARY (cached per ISO week, Insights tab)
+    ============================================================== */
+    if (method === 'GET' && url === '/api/insights/weekly-summary') {
+      const user = requireAuth(req, res);
+      if (!user) return;
+
+      const now   = new Date();
+      const dow   = now.getDay(); // 0=Sun
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - dow);
+      const weekStartISO = weekStart.toISOString().split('T')[0];
+      const today        = now.toISOString().split('T')[0];
+      const weekKey      = weekStartISO;
+
+      const allCached = readJSON(weeklyInsightFile(user.id), {});
+      if (allCached[weekKey]) {
+        return sendJSON(res, 200, { ...allCached[weekKey], cached: true });
+      }
+
+      // Compute stats from entries + mood logs
+      const entries    = readJSON(entriesFile(user.id));
+      const weekEntries = entries.filter(e => e.date >= weekStartISO && e.date <= today);
+      const totalWords  = weekEntries.reduce((s, e) => s + (e.text ? e.text.trim().split(/\s+/).length : 0), 0);
+
+      const logs      = readJSON(moodLogsFile(user.id));
+      const weekLogs  = logs.filter(l => l.date >= weekStartISO && l.date <= today);
+      const moodCounts = {};
+      weekLogs.forEach(l => { moodCounts[l.mood] = (moodCounts[l.mood] || 0) + 1; });
+      const topMood = Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+
+      const stats = { entries: weekEntries.length, words: totalWords, topMood };
+
+      // Generate one-line AI insight (only if entries exist and API key is set)
+      let aiInsight = null;
+      if (API_KEY && weekEntries.length > 0) {
+        try {
+          const sample = weekEntries.slice(0, 5)
+            .map((e, i) => `Entry ${i + 1} (${e.date}):\n${e.text.slice(0, 250)}`)
+            .join('\n\n');
+          const result = await callClaude(
+            [{ role: 'user', content: `Based on these journal entries from this week, write ONE encouraging sentence (max 30 words) about the person's journey:\n\n${sample}` }],
+            'You are a warm life coach. Respond with exactly one encouraging sentence, max 30 words. No preamble, no quotes.'
+          );
+          aiInsight = result.content[0].text.trim();
+        } catch { aiInsight = null; }
+      }
+
+      const summary = { weekKey, stats, aiInsight, generatedAt: Date.now() };
+      allCached[weekKey] = summary;
+      writeJSON(weeklyInsightFile(user.id), allCached);
+      return sendJSON(res, 200, { ...summary, cached: false });
+    }
+
+    /* ==============================================================
+       CHANGE PASSWORD (Profile tab)
+    ============================================================== */
+    if (method === 'POST' && url === '/api/auth/change-password') {
+      const user = requireAuth(req, res);
+      if (!user) return;
+      const { currentPassword, newPassword } = await readBody(req);
+      if (!currentPassword || !newPassword)
+        return sendJSON(res, 400, { error: 'Both current and new password are required.' });
+      if (newPassword.length < 8)
+        return sendJSON(res, 400, { error: 'New password must be at least 8 characters.' });
+
+      const users      = readJSON(USERS_FILE);
+      const userRecord = users.find(u => u.id === user.id);
+      if (!userRecord || hashPassword(currentPassword, userRecord.salt) !== userRecord.passwordHash)
+        return sendJSON(res, 400, { error: 'Current password is incorrect.' });
+
+      const salt = crypto.randomBytes(32).toString('hex');
+      updateUser(user.id, { passwordHash: hashPassword(newPassword, salt), salt });
+      return sendJSON(res, 200, { ok: true });
     }
 
     /* ==============================================================
