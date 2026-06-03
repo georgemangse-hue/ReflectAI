@@ -1955,7 +1955,7 @@ Your check-in should note any specific evidence from the journal entries that re
     /* ==============================================================
        STATIC FILES
     ============================================================== */
-    const urlPath  = (url === '/' ? '/index.html' : url === '/admin' ? '/admin.html' : url === '/demo' ? '/demo.html' : url === '/join' ? '/index.html' : url);
+    const urlPath  = (url === '/' ? '/index.html' : url === '/admin' ? '/admin.html' : url === '/demo' ? '/demo.html' : url === '/join' ? '/index.html' : url === '/timeline' ? '/timeline.html' : url);
     const filePath = path.resolve(PUBLIC, '.' + urlPath);
     if (!filePath.startsWith(PUBLIC + path.sep) && filePath !== PUBLIC) {
       res.writeHead(403); return res.end('Forbidden');

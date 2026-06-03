@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The ReflectAI Journey</title>
+  <meta name="description" content="From a single conversation about an idea, to a live product. The story of building ReflectAI." />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#3a8f65" />
+  <script>
+    (function () {
+      var s = localStorage.getItem('reflectai_theme');
+      var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', s || (d ? 'dark' : 'light'));
+    })();
+  </script>
+  <style>
+/* ── Tokens ── */
+:root {
+  --bg:           #f4fbf7;
+  --surface:      #ffffff;
+  --surface-2:    #f0f9f4;
+  --primary:      #3a8f65;
+  --primary-dk:   #2a6b4a;
+  --primary-lt:   #e8f5ef;
+  --text:         #1b3028;
+  --muted:        #587568;
+  --border:       #cde5d8;
+  --sh:           0 4px 18px rgba(30,90,60,.09),0 2px 6px rgba(30,90,60,.05);
+  --sh-lg:        0 12px 36px rgba(30,90,60,.14),0 4px 12px rgba(30,90,60,.07);
+  --r:            16px;
+  --ease:         0.22s cubic-bezier(.4,0,.2,1);
+  --line-x:       52px; /* centre of the vertical line on desktop */
+}
+[data-theme="dark"] {
+  --bg:        #0e1e17; --surface:#162a1f; --surface-2:#1c3328;
+  --primary:   #4caf80; --primary-dk:#3a8f65; --primary-lt:#1e3d2d;
+  --text:      #d8ede3; --muted:#7aaa8e; --border:#2a4a36;
+  --sh:        0 4px 18px rgba(0,0,0,.3),0 2px 6px rgba(0,0,0,.2);
+  --sh-lg:     0 12px 36px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.25);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Inter',system-ui,sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── Scroll-progress bar ── */
+#progress-bar{
+  position:fixed;top:0;left:0;width:0%;height:3px;z-index:999;
+  background:linear-gradient(90deg,#f59e0b,#8b5cf6,var(--primary));
+  transition:width .1s linear;
+}
+
+/* ── Nav ── */
+.nav{
+  position:sticky;top:3px;z-index:100;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;height:60px;box-shadow:var(--sh);
+}
+.nav-logo{font-size:1.1rem;font-weight:800;color:var(--primary);text-decoration:none}
+.nav-back{
+  font-size:.88rem;color:var(--muted);text-decoration:none;
+  display:flex;align-items:center;gap:6px;padding:7px 14px;
+  border-radius:100px;border:1px solid var(--border);background:var(--surface-2);
+  transition:background var(--ease),color var(--ease);
+}
+.nav-back:hover{background:var(--primary-lt);color:var(--primary)}
+
+/* ── Hero ── */
+.hero{
+  position:relative;overflow:hidden;
+  background:linear-gradient(160deg,var(--surface-2) 0%,var(--bg) 100%);
+  border-bottom:1px solid var(--border);
+  padding:72px 24px 56px;text-align:center;
+}
+.hero-dots{
+  position:absolute;inset:0;
+  background-image:radial-gradient(circle,var(--border) 1px,transparent 1px);
+  background-size:28px 28px;opacity:.6;pointer-events:none;
+}
+.hero-content{position:relative;z-index:1;max-width:660px;margin:0 auto}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--primary-lt);color:var(--primary);
+  border:1px solid var(--border);border-radius:100px;
+  padding:6px 18px;font-size:.78rem;font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase;margin-bottom:22px;
+}
+.hero h1{
+  font-size:clamp(2.1rem,5vw,3.2rem);font-weight:800;line-height:1.08;
+  margin-bottom:18px;
+}
+.hero h1 em{font-style:normal;color:var(--primary)}
+.hero p{font-size:1.05rem;color:var(--muted);margin-bottom:10px}
+.hero-dates{
+  display:inline-flex;align-items:center;gap:10px;margin-top:12px;
+  font-size:.85rem;color:var(--muted);font-weight:600;
+}
+.hero-dates span{
+  display:inline-block;background:var(--surface);border:1px solid var(--border);
+  border-radius:6px;padding:3px 10px;
+}
+.hero-dates .arrow{color:var(--primary);font-size:1.1rem}
+
+/* ── Stats ── */
+.stats-section{
+  max-width:820px;margin:0 auto;padding:48px 24px 0;
+}
+.stats-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:16px;
+}
+.stat-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r);padding:22px 16px 18px;text-align:center;
+  box-shadow:var(--sh);position:relative;overflow:hidden;
+  opacity:0;transform:translateY(16px);
+  transition:opacity .5s ease,transform .5s ease,box-shadow var(--ease);
+}
+.stat-card.vis{opacity:1;transform:translateY(0)}
+.stat-card:hover{box-shadow:var(--sh-lg);transform:translateY(-2px)}
+.stat-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:var(--c,var(--primary));
+}
+.stat-icon{font-size:1.4rem;margin-bottom:8px}
+.stat-num{
+  font-size:2rem;font-weight:800;line-height:1;
+  color:var(--c,var(--primary));margin-bottom:4px;
+}
+.stat-label{font-size:.78rem;color:var(--muted);font-weight:500}
+
+/* ── Quote ── */
+.quote-section{max-width:820px;margin:40px auto 0;padding:0 24px}
+.quote-box{
+  position:relative;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r);padding:28px 32px 28px 52px;
+  box-shadow:var(--sh);
+}
+.quote-mark{
+  position:absolute;left:20px;top:20px;
+  font-size:3rem;line-height:1;color:var(--primary);opacity:.3;
+  font-family:Georgia,serif;font-weight:700;
+}
+.quote-text{font-size:1.05rem;font-style:italic;color:var(--text);line-height:1.75}
+.quote-author{margin-top:12px;font-size:.83rem;color:var(--muted);font-weight:600}
+
+/* ── Phase banner ── */
+.phase-banner{
+  max-width:820px;margin:0 auto;padding:0 24px;
+}
+.phase-inner{
+  display:flex;align-items:center;gap:14px;
+  margin:52px 0 0;padding:12px 20px;
+  border-radius:100px;background:var(--phase-bg);
+  border:1.5px solid var(--phase-border);
+}
+.phase-dot{
+  width:10px;height:10px;border-radius:50%;
+  background:var(--phase-color);flex-shrink:0;
+}
+.phase-label{
+  font-size:.78rem;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--phase-color);
+}
+.phase-desc{font-size:.82rem;color:var(--muted);margin-left:auto}
+
+/* ── Timeline track ── */
+.timeline-section{
+  max-width:820px;margin:0 auto;
+  padding:0 24px 80px;
+}
+
+/* the vertical spine */
+.timeline-track{position:relative;padding-top:24px}
+.timeline-track::before{
+  content:'';
+  position:absolute;left:var(--line-x);top:0;bottom:0;width:2px;
+  background:linear-gradient(
+    to bottom,
+    transparent 0%,
+    var(--border) 4%,
+    var(--primary) 10%,
+    var(--primary) 90%,
+    var(--border) 96%,
+    transparent 100%
+  );
+  border-radius:2px;
+}
+
+/* ── Entry ── */
+.tl-entry{
+  display:flex;align-items:flex-start;gap:0;
+  margin-bottom:36px;position:relative;
+  opacity:0;transform:translateY(22px);
+  transition:opacity .55s ease,transform .55s ease;
+}
+.tl-entry.vis{opacity:1;transform:translateY(0)}
+
+/* node */
+.tl-node{
+  flex-shrink:0;
+  width:56px;height:56px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.4rem;position:relative;z-index:2;
+  background:var(--node-bg);
+  box-shadow:0 0 0 4px var(--bg),0 0 0 6px var(--node-ring,var(--border)),var(--sh);
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1),box-shadow var(--ease);
+  cursor:default;
+}
+.tl-entry:hover .tl-node{
+  transform:scale(1.12);
+  box-shadow:0 0 0 4px var(--bg),0 0 0 8px var(--node-ring,var(--border)),var(--sh-lg);
+}
+.tl-node.pulse{
+  animation:nodepulse 2.4s ease infinite;
+}
+@keyframes nodepulse{
+  0%,100%{box-shadow:0 0 0 4px var(--bg),0 0 0 7px var(--node-ring),0 0 18px var(--node-glow,transparent)}
+  50%{box-shadow:0 0 0 4px var(--bg),0 0 0 12px var(--node-ring),0 0 28px var(--node-glow,transparent)}
+}
+
+/* connector from node to card */
+.tl-connector{
+  flex-shrink:0;width:32px;height:2px;
+  background:var(--node-ring,var(--border));
+  margin-top:27px;opacity:.6;
+}
+
+/* card */
+.tl-card{
+  flex:1;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r);padding:20px 22px 18px;
+  box-shadow:var(--sh);position:relative;overflow:hidden;
+  transition:box-shadow var(--ease),transform var(--ease);
+}
+.tl-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:var(--node-bg);
+}
+.tl-entry:hover .tl-card{box-shadow:var(--sh-lg);transform:translateY(-2px)}
+
+.tl-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px}
+.tl-date{font-size:.74rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tl-day-badge{
+  flex-shrink:0;font-size:.72rem;font-weight:700;
+  padding:3px 10px;border-radius:100px;
+  background:var(--node-bg);color:#fff;white-space:nowrap;
+}
+.tl-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:8px;line-height:1.3}
+.tl-desc{font-size:.88rem;color:var(--muted);line-height:1.65}
+.tl-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}
+.tl-tag{
+  font-size:.72rem;font-weight:600;padding:3px 10px;
+  border-radius:100px;background:var(--surface-2);
+  color:var(--muted);border:1px solid var(--border);
+}
+
+/* ── CTA ── */
+.cta-section{
+  position:relative;overflow:hidden;
+  background:linear-gradient(135deg,var(--primary-dk) 0%,var(--primary) 100%);
+  padding:72px 24px;text-align:center;color:#fff;
+}
+.cta-section::before{
+  content:'';position:absolute;inset:0;
+  background-image:radial-gradient(circle,rgba(255,255,255,.08) 1px,transparent 1px);
+  background-size:24px 24px;
+}
+.cta-content{position:relative;z-index:1;max-width:520px;margin:0 auto}
+.cta-section h2{font-size:clamp(1.6rem,4vw,2.2rem);font-weight:800;margin-bottom:12px}
+.cta-section p{font-size:1rem;opacity:.85;margin-bottom:28px}
+.btn-cta{
+  display:inline-block;background:#fff;
+  color:var(--primary-dk);padding:14px 32px;border-radius:100px;
+  font-size:.95rem;font-weight:700;text-decoration:none;
+  box-shadow:0 4px 20px rgba(0,0,0,.2);
+  transition:transform var(--ease),box-shadow var(--ease);
+}
+.btn-cta:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.28)}
+
+/* ── Responsive ── */
+@media(max-width:640px){
+  :root{--line-x:36px}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .tl-node{width:44px;height:44px;font-size:1.1rem}
+  .tl-connector{width:20px;margin-top:21px}
+  .tl-card{padding:14px 14px 12px}
+  .timeline-track::before{left:36px}
+  .phase-desc{display:none}
+  .hero{padding:52px 16px 44px}
+  .stats-section,.quote-section,.phase-banner,.timeline-section{padding-left:16px;padding-right:16px}
+}
+  </style>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div id="progress-bar"></div>
+
+<!-- Nav -->
+<nav class="nav">
+  <a class="nav-logo" href="/">🌿 ReflectAI</a>
+  <a class="nav-back" href="/">← Back to App</a>
+</nav>
+
+<!-- Hero -->
+<header class="hero">
+  <div class="hero-dots"></div>
+  <div class="hero-content">
+    <div class="hero-badge">🚀 The Journey</div>
+    <h1>From <em>First Idea</em><br>to Live Product</h1>
+    <p>Every great product starts with a single conversation.<br>Here's how ReflectAI went from "what if" to people's hands.</p>
+    <div class="hero-dates">
+      <span>May 24, 2026</span>
+      <span class="arrow">→</span>
+      <span>Today</span>
+    </div>
+  </div>
+</header>
+
+<!-- Stats -->
+<section class="stats-section">
+  <div class="stats-grid">
+    <div class="stat-card" style="--c:#f59e0b" data-target="10" data-suffix="">
+      <div class="stat-icon">⚡</div>
+      <div class="stat-num" data-counter="10">0</div>
+      <div class="stat-label">Days to ship v1</div>
+    </div>
+    <div class="stat-card" style="--c:#8b5cf6" data-target="40" data-suffix="+">
+      <div class="stat-icon">🔧</div>
+      <div class="stat-num" data-counter="40">0</div>
+      <div class="stat-label">Features built</div>
+    </div>
+    <div class="stat-card" style="--c:#06b6d4" data-target="3" data-suffix="">
+      <div class="stat-icon">💳</div>
+      <div class="stat-num" data-counter="3">0</div>
+      <div class="stat-label">Payment providers</div>
+    </div>
+    <div class="stat-card" style="--c:#3a8f65" data-target="2" data-suffix="">
+      <div class="stat-icon">🌍</div>
+      <div class="stat-num" data-counter="2">0</div>
+      <div class="stat-label">Markets targeted</div>
+    </div>
+  </div>
+</section>
+
+<!-- Quote -->
+<section class="quote-section">
+  <div class="quote-box">
+    <span class="quote-mark">"</span>
+    <p class="quote-text">What if there was an AI journaling app built for students and young professionals in Nigeria — one that actually helps you grow, not just write?</p>
+    <p class="quote-author">— The first conversation · May 2026</p>
+  </div>
+</section>
+
+<!-- ──────────────────── PHASE 1 ──────────────────── -->
+<div class="phase-banner">
+  <div class="phase-inner" style="--phase-color:#f59e0b;--phase-bg:rgba(245,158,11,.08);--phase-border:rgba(245,158,11,.25)">
+    <div class="phase-dot"></div>
+    <span class="phase-label">Phase 1 · Ideation</span>
+    <span class="phase-desc">The spark that started everything</span>
+  </div>
+</div>
+
+<section class="timeline-section">
+<div class="timeline-track">
+
+  <!-- 1 -->
+  <div class="tl-entry" style="--node-bg:linear-gradient(135deg,#f59e0b,#fbbf24);--node-ring:#f59e0b;--node-glow:rgba(245,158,11,.35)">
+    <div class="tl-node">💡</div>
+    <div class="tl-connector"></div>
+    <div class="tl-card">
+      <div class="tl-top">
+        <div class="tl-date">Before Day 1 · May 2026</div>
+        <div class="tl-day-badge" style="background:#f59e0b">The Spark</div>
+      </div>
+      <div class="tl-title">The Spark: "What if journaling could be smarter?"</div>
+      <div class="tl-desc">A single question in a conversation: could AI make journaling genuinely useful — not just a place to dump thoughts, but a tool that reflects insight, tracks mood, and coaches growth? The target: students and young professionals across Nigeria and beyond.</div>
+      <div class="tl-tags">
+        <span class="tl-tag">💬 Initial Idea</span>
+        <span class="tl-tag">🎯 Problem Statement</span>
+        <span class="tl-tag">🇳🇬 Nigerian Market</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</section>
+
+<!-- ──────────────────── PHASE 2 ──────────────────── -->
+<div class="phase-banner">
+  <div class="phase-inner" style="--phase-color:#3b82f6;--phase-bg:rgba(59,130,246,.08);--phase-border:rgba(59,130,246,.25)">
+    <div class="phase-dot"></div>
+    <span class="phase-label">Phase 2 · Build</span>
+    <span class="phase-desc">From idea to working product</span>
+  </div>
+</div>
+
+<section class="timeline-section" style="padding-top:0">
+<div class="timeline-track">
+
+  <!-- 2 -->
+  <div class="tl-entry" style="--node-bg:linear-gradient(135deg,#3b82f6,#60a5fa);--node-ring:#3b82f6;--node-glow:rgba(59,130,246,.35)">
+    <div class="tl-node">🏗️</div>
+    <div class="tl-connector"></div>
+    <div class="tl-card">
+      <div class="tl-top">
+        <div class="tl-date">May 24, 2026</div>
+        <div class="tl-day-badge" style="background:#3b82f6">Day 1</div>
+      </div>
+      <div class="tl-title">Foundation: First Working Version</div>
+      <div class="tl-desc">The initial commit landed with a complete working app — user auth, daily journal entries, mood tracking, AI-generated reflections via Claude, and payment integration with both Paystack and Stripe. Not a prototype: a real product from day one.</div>
+      <div class="tl-tags">
+        <span class="tl-tag">🔐 Auth</span>
+        <span class="tl-tag">📝 Journaling</span>
+        <span class="tl-tag">🤖 Claude AI</span>
+        <span class="tl-tag">💳 Paystack + Stripe</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3 -->
+  <div class="tl-entry" style="--node-bg:linear-gradient(135deg,#06b6d4,#22d3ee);--node-ring:#06b6d4;--node-glow:rgba(6,182,212,.35)">
+    <div class="tl-node">📱</div>
+    <div class="tl-connector"></div>
+    <div class="tl-card">
+      <div class="tl-top">
+        <div class="tl-date">May 24, 2026 · Same Day</div>
+        <div class="tl-day-badge" style="background:#06b6d4">Day 1</div>
+      </div>
+      <div class="tl-title">Mobile-First: PWA Support Launched</div>
+      <div class="tl-desc">Added Progressive Web App support — service worker, manifest, icons, and smart install banners for Android and iOS. Users could pin ReflectAI to their home screen and use it like a native app, critical for the mobile-first Nigerian audience.</div>
+      <div class="tl-tags">
+        <span class="tl-tag">📲 PWA</span>
+        <span class="tl-tag">📴 Offline-Ready</span>
+        <span class="tl-tag">🔔 Install Banner</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</section>
+
+<!-- ──────────────────── PHASE 3 ──────────────────── -->
+<div class="phase-banner">
+  <div class="phase-inner" style="--phase-color:#14b8a6;--phase-bg:rgba(20,184,166,.08);--phase-border:rgba(20,184,166,.25)">
+    <div class="phase-dot"></div>
+    <span class="phase-label">Phase 3 · Polish</span>
+    <span class="phase-desc">UX, trust signals, and market fit</span>
+  </div>
+</div>
+
+<section class="timeline-section" style="padding-top:0">
+<div class="timeline-track">
+
+  <!-- 4 -->
+  <div class="tl-entry" style="--node-bg:linear-gradient(135deg,#14b8a6,#2dd4bf);--node-ring:#14b8a6;--node-glow:rgba(20,184,166,.35)">
+    <div class="tl-node">✨</div>
+    <div class="tl-connector"></div>
+    <div class="tl-card">
+      <div class="tl-top">
+        <div class="tl-date">May 25–26, 2026</div>
+        <div class="tl-day-badge" style="background:#14b8a6">Days 2–3</div>
+      </div>
+      <div class="tl-title">User Experience: Onboarding, Search, Legal</div>
+      <div class="tl-desc">Rolled out a 3-step first-time onboarding flow, trial access to Pro features, live keyword search in Entry History, a proper account dropdown, and full Privacy Policy and Terms of Service pages with Nigerian business details.</div>
+      <div class="tl-tags">
+        <span class="tl-tag">🎓 3-Step Onboarding</span>
+        <span class="tl-tag">🔍 Live Search</span>
+        <span class="tl-tag">⚖️ Legal Pages</span>
+        <span class="tl-tag">🆓 Pro Trial</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5 -->
+  <div class="tl-entry" style="--node-bg:linear-gradient(135deg,#f97316,#fb923c);--node-ring:#f97316;--node-glow:rgba(249,115,22,.35)">
+    <div class="tl-node">🌍</div>
+    <div class="tl-connector"></div>
+    <div class="tl-card">
+      <div class="tl-top">
+        <div class="tl-date">May 27–29, 2026</div>
+        <div class="tl-day-badge" style="background:#f97316">Days 4–6</div>
+      </div>
+      <div class="tl-title">Market Fit: Geo-Based Pricing for Two Markets</div>
+      <div class="tl-desc">Implemented smart geo-detection: Nigerian users see ₦3,000/month via Paystack or Flutterwave; international users see $7.99/month via Stripe. Iterated through multiple detection approaches until bulletproof. The right price, for the right market, automatically.</div>
+      <div class="tl-tags">
+        <span class="tl-tag">₦ NGN 3,000</span>
+        <span class="tl-tag">$ $7.99</span>
+        <span class="tl-tag">🎯 Localisation</span>
+        <span class="tl-tag">🌐 Flutterwave</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</section>
+
+<!-- ──────────────────── PHASE 4 ──────────────────── -->
+<div class="phase-banner">
+  <div class="phase-inner" style="--phase-color:#8b5cf6;--phase-bg:rgba(139,92,246,.08);--phase-border:rgba(139,92,246,.25)">
+    <div class="phase-dot"></div>
+    <span class="phase-label">Phase 4 · AI Depth</span>
+    <span class="phase-desc">Making the journal a growth partner</span>
+  </div>
+</div>
+
+<section class="timeline-section" style="padding-top:0">
+<div class="timeline-track">
+
+  <!-- 6 -->
+  <div class="tl-entry" style="--node-bg:linear-gradient(135deg,#8b5cf6,#a78bfa);--node-ring:#8b5cf6;--node-glow:rgba(139,92,246,.35)">
+    <div class="tl-node">🧠</div>
+    <div class="tl-connector"></div>
+    <div class="tl-card">
+      <div class="tl-top">
+        <div class="tl-date">May 29, 2026</div>
+        <div class="tl-day-badge" style="background:#8b5cf6">Day 6</div>
+      </div>
+      <div class="tl-title">AI Depth: Conversational Coaching Engine</div>
+      <div class="tl-desc">Reflection prompts evolved into a full coaching experience — multi-turn conversations, NLP presuppositions and language patterns, session completion screens, and exchange limits (6 free / 10 Pro). The journal became a growth partner, not just a log.</div>
+      <div class="tl-tags">
+        <span class="tl-tag">💬 Multi-turn Chat</span>
+        <span class="tl-tag">🧬 NLP Patterns</span>
+        <span class="tl-tag">🏁 Session Screens</span>
+        <span class="tl-tag">📊 Usage Limits</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</section>
+
+<!-- ──────────────────── PHASE 5 ──────────────────── -->
+<div class="phase-banner">
+  <div class="phase-inner" style="--phase-color:#f43f5e;--phase-bg:rgba(244,63,94,.08);--phase-border:rgba(244,63,94,.25)">
+    <div class="phase-dot"></div>
+    <span class="phase-label">Phase 5 · Growth</span>
+    <span class="phase-desc">Infrastructure for acquiring and retaining users</span>
+  </div>
+</div>
+
+<section class="timeline-section" style="padding-top:0">
+<div class="timeline-track">
+
+  <!-- 7 -->
+  <div class="tl-entry" style="--node-bg:linear-gradient(135deg,#f43f5e,#fb7185);--node-ring:#f43f5e;--node-glow:rgba(244,63,94,.35)">
+    <div class="tl-node">📈</div>
+    <div class="tl-connector"></div>
+    <div class="tl-card">
+      <div class="tl-top">
+        <div class="tl-date">May 30, 2026</div>
+        <div class="tl-day-badge" style="background:#f43f5e">Day 7</div>
+      </div>
+      <div class="tl-title">Growth Infrastructure: Referrals &amp; Email</div>
+      <div class="tl-desc">Built a complete referral system — unique codes, credit tracking, a shareable page, caps at 3 free months/year, and conversion email notifications. Set up Gmail SMTP for transactional email and shipped a password reset flow with 24-hour expiry links.</div>
+      <div class="tl-tags">
+        <span class="tl-tag">🔗 Referral System</span>
+        <span class="tl-tag">📧 Transactional Email</span>
+        <span class="tl-tag">🔑 Password Reset</span>
+        <span class="tl-tag">🎁 Credit Rewards</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8 -->
+  <div class="tl-entry" style="--node-bg:linear-gradient(135deg,#6366f1,#818cf8);--node-ring:#6366f1;--node-glow:rgba(99,102,241,.35)">
+    <div class="tl-node">🔬</div>
+    <div class="tl-connector"></div>
+    <div class="tl-card">
+      <div class="tl-top">
+        <div class="tl-date">June 1, 2026</div>
+        <div class="tl-day-badge" style="background:#6366f1">Day 9</div>
+      </div>
+      <div class="tl-title">Research Mode: Listening to the Market</div>
+      <div class="tl-desc">Replaced the generic feedback form with a 9-question market research survey. Wove African cultural context into every Claude AI system prompt so the coaching feels local, not like it was built for Silicon Valley. Built feedback analytics for the admin dashboard.</div>
+      <div class="tl-tags">
+        <span class="tl-tag">📋 9-Q Survey</span>
+        <span class="tl-tag">🌍 African Context</span>
+        <span class="tl-tag">📊 Feedback Analytics</span>
+        <span class="tl-tag">🎙️ User Research</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</section>
+
+<!-- ──────────────────── PHASE 6 ──────────────────── -->
+<div class="phase-banner">
+  <div class="phase-inner" style="--phase-color:#3a8f65;--phase-bg:rgba(58,143,101,.08);--phase-border:rgba(58,143,101,.3)">
+    <div class="phase-dot"></div>
+    <span class="phase-label">Phase 6 · Today</span>
+    <span class="phase-desc">Live, paying users, ready to scale</span>
+  </div>
+</div>
+
+<section class="timeline-section" style="padding-top:0">
+<div class="timeline-track">
+
+  <!-- 9 (current) -->
+  <div class="tl-entry" style="--node-bg:linear-gradient(135deg,#3a8f65,#4caf80);--node-ring:#3a8f65;--node-glow:rgba(58,143,101,.4)">
+    <div class="tl-node pulse">⭐</div>
+    <div class="tl-connector"></div>
+    <div class="tl-card" style="background:var(--primary-lt);border-color:var(--primary)">
+      <div class="tl-top">
+        <div class="tl-date">June 2, 2026</div>
+        <div class="tl-day-badge" style="background:#3a8f65">Now</div>
+      </div>
+      <div class="tl-title">Today: PDF Export &amp; Ready to Scale</div>
+      <div class="tl-desc">Pro users can now export their entire journal as a beautifully formatted PDF — a meaningful artifact of their growth journey. The product is live, polished, and generating real revenue. What started as a single "what if" conversation is a complete product in real people's hands.</div>
+      <div class="tl-tags">
+        <span class="tl-tag">📄 PDF Export</span>
+        <span class="tl-tag">💰 Paying Users</span>
+        <span class="tl-tag">🚀 Live Product</span>
+        <span class="tl-tag">🌱 Growing</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</section>
+
+<!-- CTA -->
+<footer class="cta-section">
+  <div class="cta-content">
+    <h2>The story continues 🌿</h2>
+    <p>Every entry you write is part of your own timeline. Start yours today.</p>
+    <a href="/" class="btn-cta">Open ReflectAI →</a>
+  </div>
+</footer>
+
+<script>
+// ── Scroll progress bar
+const bar = document.getElementById('progress-bar');
+window.addEventListener('scroll', () => {
+  const pct = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight) * 100;
+  bar.style.width = Math.min(pct, 100) + '%';
+}, { passive: true });
+
+// ── Intersection observer for reveal + counter trigger
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    entry.target.classList.add('vis');
+    io.unobserve(entry.target);
+
+    // Animate counter if this is a stat card
+    const numEl = entry.target.querySelector('[data-counter]');
+    if (numEl) {
+      const target = parseInt(entry.target.dataset.target, 10);
+      const suffix = entry.target.dataset.suffix || '';
+      let start = 0;
+      const dur = 900;
+      const step = 16;
+      const inc = target / (dur / step);
+      const t = setInterval(() => {
+        start = Math.min(start + inc, target);
+        numEl.textContent = Math.round(start) + suffix;
+        if (start >= target) clearInterval(t);
+      }, step);
+    }
+  });
+}, { threshold: 0.15, rootMargin: '0px 0px -32px 0px' });
+
+document.querySelectorAll('.tl-entry, .stat-card').forEach(el => io.observe(el));
+</script>
+</body>
+</html>
