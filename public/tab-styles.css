@@ -1,11 +1,13 @@
 
 /* ================================================================
    50. 5-TAB APP SHELL
-   New layout: fixed header + fixed bottom nav + scrollable tabs
+   Mobile  (< 768px): fixed bottom nav bar
+   Desktop (≥ 768px): fixed left sidebar
 ================================================================ */
 :root {
   --app-header-h: 56px;
   --tab-nav-h:    65px;
+  --sidebar-w:    180px;
   --active-green: #1D9E75;
   --light-green:  #E1F5EE;
 }
@@ -48,6 +50,7 @@
 .app-logo strong { color: var(--text); }
 
 /* ── Tab content shell ─────────────────────────────────────── */
+/* Base (mobile-first): offset by header top + bottom nav bottom */
 .tab-main {
   position: fixed;
   top: var(--app-header-h);
@@ -70,52 +73,36 @@
   margin: 0 auto;
 }
 
-/* ── Bottom nav ─────────────────────────────────────────────── */
+/* ── Shared nav chrome ──────────────────────────────────────── */
 .bottom-nav {
   position: fixed;
-  bottom: 0; left: 0; right: 0;
-  height: calc(var(--tab-nav-h) + env(safe-area-inset-bottom, 0px));
-  padding-bottom: env(safe-area-inset-bottom, 0px);
   z-index: 200;
-  background: var(--surface);
-  border-top: 1px solid #eee;
+  background: #fff;
   display: flex;
-  align-items: stretch;
 }
-[data-theme="dark"] .bottom-nav {
-  border-top-color: var(--border);
-  background: var(--surface);
+[data-theme="dark"] .bottom-nav { background: var(--surface); }
+
+/* Brand logo — hidden on mobile, shown in sidebar on desktop */
+.nav-brand {
+  display: none;
 }
 
+/* Shared item defaults */
 .bottom-nav-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
   background: none;
   border: none;
   cursor: pointer;
   color: #999;
-  font-size: 0.62rem;
-  font-weight: 600;
   font-family: inherit;
-  letter-spacing: 0.02em;
-  padding: 0;
-  transition: color 0.18s ease;
+  transition: color 0.18s ease, background 0.15s;
   -webkit-tap-highlight-color: transparent;
 }
-.bottom-nav-item:hover { color: var(--active-green); }
+.bottom-nav-item:hover  { color: var(--active-green); }
 .bottom-nav-item.active { color: var(--active-green); }
 .nav-svg {
-  width: 22px;
-  height: 22px;
   stroke-width: 2;
+  flex-shrink: 0;
   transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.bottom-nav-item.active .nav-svg {
-  transform: translateY(-2px);
 }
 
 
@@ -857,36 +844,152 @@
 
 
 /* ================================================================
-   56. DARK MODE adjustments for new elements
+   56. MOBILE NAV  (< 768px) — horizontal bottom bar
 ================================================================ */
-[data-theme="dark"] .bottom-nav { border-top-color: var(--border); }
-
-/* ================================================================
-   57. RESPONSIVE tweaks for tab layout
-================================================================ */
-@media (max-width: 600px) {
+@media (max-width: 767px) {
   body { padding-bottom: 0 !important; }
 
-  .profile-stats-row { grid-template-columns: repeat(2, 1fr); }
-  .profile-stat-num  { font-size: 1.1rem; }
-  .weekly-stats-row  { gap: 0.4rem; }
-  .weekly-stat-num   { font-size: 1.15rem; }
+  .bottom-nav {
+    top: auto; /* override nav { top: 0 } from style.css */
+    bottom: 0; left: 0; right: 0;
+    width: auto; height: calc(var(--tab-nav-h) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    border-top: 1px solid #eee;
+    flex-direction: row;
+    align-items: stretch;
+  }
+  [data-theme="dark"] .bottom-nav { border-top-color: var(--border); }
 
+  .bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 0;
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .bottom-nav-item.active .nav-svg { transform: translateY(-2px); }
+  .nav-svg { width: 22px; height: 22px; }
+
+  /* Toast + PWA banner clear the bottom nav */
   .toast {
-    left: 1rem;
-    right: 1rem;
+    left: 1rem; right: 1rem;
     bottom: calc(var(--tab-nav-h) + env(safe-area-inset-bottom, 0px) + 0.75rem);
     max-width: none;
   }
   .pwa-banner {
     bottom: calc(var(--tab-nav-h) + env(safe-area-inset-bottom, 0px) + 0.75rem);
   }
-}
-@media (min-width: 601px) {
-  body { padding-bottom: 0 !important; }
-  .toast { bottom: calc(var(--tab-nav-h) + 1rem); }
-  .pwa-banner { bottom: calc(var(--tab-nav-h) + 1rem); }
+
+  /* Profile stats 2×2 on small screens */
+  .profile-stats-row { grid-template-columns: repeat(2, 1fr); }
+  .profile-stat-num  { font-size: 1.1rem; }
+  .weekly-stats-row  { gap: 0.4rem; }
+  .weekly-stat-num   { font-size: 1.15rem; }
 }
 
-/* Hide old nav elements */
+
+/* ================================================================
+   57. DESKTOP NAV  (≥ 768px) — left sidebar
+================================================================ */
+@media (min-width: 768px) {
+  body { padding-bottom: 0 !important; }
+
+  /* ── Sidebar shell ── */
+  .bottom-nav {
+    top: 0; left: 0; bottom: 0; right: auto;
+    width: var(--sidebar-w);
+    height: auto; /* override nav { height: 62px } from style.css */
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    border-top: none;
+    border-right: 1px solid #eee;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  [data-theme="dark"] .bottom-nav {
+    border-right-color: var(--border);
+    border-top: none;
+  }
+
+  /* ── Sidebar logo ── */
+  .nav-brand {
+    display: flex;
+    align-items: center;
+    padding: 1.25rem 1rem 0.9rem;
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--active-green);
+    letter-spacing: -0.02em;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 0.5rem;
+    flex-shrink: 0;
+    text-decoration: none;
+    line-height: 1;
+  }
+  .nav-brand strong { color: var(--text); }
+  [data-theme="dark"] .nav-brand { border-bottom-color: var(--border); }
+
+  /* ── Sidebar nav items ── */
+  .bottom-nav-item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.65rem;
+    padding: 0.7rem 1rem;
+    font-size: 0.88rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    border-radius: 8px;
+    margin: 2px 8px;
+    flex: 0 0 auto;
+    width: auto;
+  }
+  .bottom-nav-item.active {
+    background: #E1F5EE;
+    color: #1D9E75;
+  }
+  [data-theme="dark"] .bottom-nav-item.active {
+    background: var(--primary-light);
+  }
+  .bottom-nav-item:hover:not(.active) {
+    background: #f5f5f5;
+    color: var(--text);
+  }
+  [data-theme="dark"] .bottom-nav-item:hover:not(.active) {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  .bottom-nav-item.active .nav-svg { transform: none; }
+  .nav-svg { width: 18px; height: 18px; }
+
+  /* ── App header: shift right of sidebar ── */
+  .app-header { left: var(--sidebar-w); }
+  /* Hide the logo in the header on desktop (sidebar carries it) */
+  .app-header .app-logo { display: none; }
+
+  /* ── Tab main: right of sidebar, below header ── */
+  .tab-main {
+    left: var(--sidebar-w);
+    bottom: 0;
+    /* top stays var(--app-header-h); right stays 0 */
+  }
+
+  /* Wider content area on desktop */
+  .tab-scroll { max-width: 760px; }
+
+  /* Toast + PWA banner */
+  .toast       { left: calc(var(--sidebar-w) + 1rem); bottom: 1.5rem; max-width: 360px; }
+  .pwa-banner  { left: calc(var(--sidebar-w) + 1rem); bottom: 1.5rem; }
+}
+
+
+/* ── Suppress old mobile nav element (legacy) ── */
 nav.mobile-nav { display: none !important; }
