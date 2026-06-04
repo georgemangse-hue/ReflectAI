@@ -197,6 +197,7 @@
               <span class="table-heading">Feedback Responses</span>
               <span class="table-count-pill" id="fb-count"></span>
             </div>
+            <button class="btn-top" onclick="downloadCSV()" style="border-color:#2d8653;color:#4dba7e">⬇ Download CSV</button>
           </div>
           <div id="fb-body"><div class="no-data">Loading…</div></div>
         </div>
@@ -404,6 +405,46 @@
         err.textContent = ex.message === 'bad_key' ? 'Invalid admin key.' : 'Could not reach server.';
         err.style.display = 'block';
       } finally { btn.disabled = false; btn.textContent = 'Sign in →'; }
+    }
+
+    /* ── CSV Export ────────────────────────────────── */
+    function downloadCSV() {
+      if (!allFeedback.length) {
+        alert('No feedback loaded. Open the Feedback tab first, then try again.');
+        return;
+      }
+      const csvEsc = v => {
+        const s = String(v ?? '');
+        return (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r'))
+          ? '"' + s.replace(/"/g, '""') + '"' : s;
+      };
+      const headers = [
+        'Respondent', 'Timestamp',
+        'Q1: Role',
+        'Q2: Currently journals',
+        'Q3: Barriers to journaling',
+        'Q4: When stressed',
+        'Q5: Motivation to journal daily',
+        'Q6: Would pay',
+        'Q7: Fair price',
+        'Q8: Feature that would help most',
+        'Q9: Concerns about AI journaling'
+      ];
+      const rows = allFeedback.map((f, i) => [
+        i + 1,
+        f.createdAt ? new Date(f.createdAt).toISOString() : '',
+        f.q1, f.q2, f.q3, f.q4, f.q5, f.q6, f.q7, f.q8, f.q9
+      ].map(csvEsc).join(','));
+      const csv = [headers.map(csvEsc).join(','), ...rows].join('\r\n');
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url;
+      a.download = 'reflectai-feedback-' + new Date().toISOString().slice(0, 10) + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
 
     /* ── Auto-login if key stored ───────────────────── */
