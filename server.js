@@ -42,6 +42,7 @@ const FLUTTERWAVE_PUBLIC_KEY     = process.env.FLUTTERWAVE_PUBLIC_KEY     || '';
 const FLUTTERWAVE_SECRET_KEY     = process.env.FLUTTERWAVE_SECRET_KEY     || '';
 const APP_URL                    = process.env.APP_URL                    || `http://localhost:${PORT}`;
 const ADMIN_SECRET           = process.env.ADMIN_SECRET           || crypto.randomBytes(16).toString('hex');
+const ADMIN_EMAIL            = (process.env.ADMIN_EMAIL || process.env.SMTP_USER || '').toLowerCase().trim();
 const GMAIL_APP_PASSWORD     = process.env.GMAIL_APP_PASSWORD     || '';
 const SMTP_USER              = process.env.SMTP_USER              || 'georgemangse@gmail.com';
 const EMAIL_FROM_NAME        = process.env.EMAIL_FROM_NAME        || 'ReflectAI by PremierLEADZ';
@@ -754,20 +755,28 @@ const server = http.createServer(async (req, res) => {
     ============================================================== */
     if (method === 'GET' && url === '/api/admin/users') {
       if (!requireAdmin(req, res)) return;
-      const users = readJSON(USERS_FILE);
-      const now   = Date.now();
+      const users    = readJSON(USERS_FILE);
+      const sessions = readJSON(SESSIONS_FILE);
+      const now      = Date.now();
       const rows  = users.map(u => {
-        const entries = readJSON(entriesFile(u.id));
+        const entries    = readJSON(entriesFile(u.id));
+        const lastEntry  = entries.reduce((max, e) => Math.max(max, e.createdAt || 0), 0);
+        const userSessions = sessions.filter(s => s.userId === u.id);
+        const lastSession  = userSessions.reduce((max, s) => Math.max(max, s.expiresAt - SESSION_TTL), 0);
+        const lastActive   = Math.max(lastEntry, lastSession) || null;
         return {
           id:                 u.id,
           email:              u.email,
+          firstName:          u.firstName || null,
+          lastName:           u.lastName  || null,
           plan:               u.plan,
           paid:               u.paid === true,
           subscriptionStatus: u.subscriptionStatus  || null,
           subscriptionExpiry: u.subscriptionExpiry  || null,
           subscriptionCode:   u.subscriptionCode    || null,
           entryCount:         entries.length,
-          createdAt:          u.createdAt
+          createdAt:          u.createdAt,
+          lastActive:         lastActive || u.createdAt
         };
       });
       const stats = {
@@ -778,6 +787,52 @@ const server = http.createServer(async (req, res) => {
         free:        rows.filter(u => !u.paid).length
       };
       return sendJSON(res, 200, { users: rows, stats });
+    }
+
+    if (method === 'DELETE' && url === '/api/admin/users') {
+      if (!requireAdmin(req, res)) return;
+      const { ids } = await readBody(req);
+      if (!Array.isArray(ids) || !ids.length)
+        return sendJSON(res, 400, { error: 'No user IDs provided.' });
+
+      const users = readJSON(USERS_FILE);
+      const toDelete = users.filter(u => ids.includes(u.id));
+
+      // Guard: admin email
+      if (ADMIN_EMAIL) {
+        const adminUser = toDelete.find(u => u.email.toLowerCase() === ADMIN_EMAIL);
+        if (adminUser) return sendJSON(res, 403, { error: 'You cannot delete the admin account.' });
+      }
+
+      // Guard: paying subscribers
+      const now = Date.now();
+      const paidUsers = toDelete.filter(u => {
+        if (!u.paid) return false;
+        if (!u.subscriptionExpiry) return true; // lifetime
+        return u.subscriptionExpiry > now;       // active or non-renewing
+      });
+      if (paidUsers.length)
+        return sendJSON(res, 403, {
+          error: `${paidUsers.length} selected user(s) are active subscribers. Remove them from selection before deleting.`
+        });
+
+      const deleteIds = new Set(toDelete.map(u => u.id));
+
+      // Remove from users file
+      writeJSON(USERS_FILE, users.filter(u => !deleteIds.has(u.id)));
+
+      // Remove sessions
+      const sessions = readJSON(SESSIONS_FILE);
+      writeJSON(SESSIONS_FILE, sessions.filter(s => !deleteIds.has(s.userId)));
+
+      // Remove per-user data files
+      for (const uid of deleteIds) {
+        [entriesFile(uid), goalsFile(uid), moodLogsFile(uid), weeklyInsightFile(uid)].forEach(f => {
+          try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch {}
+        });
+      }
+
+      return sendJSON(res, 200, { deleted: deleteIds.size });
     }
 
     if (method === 'GET' && url === '/api/config') {

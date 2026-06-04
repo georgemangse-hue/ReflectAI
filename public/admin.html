@@ -85,6 +85,34 @@
     .fb-detail td { white-space: normal; font-size: 0.82rem; line-height: 1.65; color: #c9d1d9; }
     .legacy-note { margin-bottom: 1rem; padding: 0.6rem 1rem; background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.3); border-radius: 8px; font-size: 0.8rem; color: #d29922; }
 
+    /* ── Checkbox ───────────────────────────────────── */
+    .cb-cell { width: 2.5rem; text-align: center; padding: 0.72rem 0.5rem !important; }
+    input[type="checkbox"] { width: 1rem; height: 1rem; accent-color: #4dba7e; cursor: pointer; }
+
+    /* ── Toolbar extras ─────────────────────────────── */
+    .btn-delete { padding: 0.38rem 0.85rem; border: 1px solid #f87171; border-radius: 6px; background: rgba(248,113,113,0.1); color: #f87171; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: background 0.12s; display: none; }
+    .btn-delete:hover { background: rgba(248,113,113,0.2); }
+    .filter-select { padding: 0.4rem 0.7rem; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e2e8f0; font-size: 0.82rem; outline: none; cursor: pointer; }
+    .filter-select:focus { border-color: #4dba7e; }
+
+    /* ── Confirmation modal ─────────────────────────── */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; display: none; }
+    .modal-overlay.open { display: flex; }
+    .modal-box { background: #161b22; border: 1px solid #30363d; border-radius: 14px; padding: 2rem; max-width: 420px; width: 90%; }
+    .modal-title { font-size: 1.05rem; font-weight: 800; color: #fff; margin-bottom: 0.6rem; }
+    .modal-body  { font-size: 0.88rem; color: #8b949e; line-height: 1.6; margin-bottom: 1.5rem; }
+    .modal-actions { display: flex; gap: 0.7rem; justify-content: flex-end; }
+    .btn-confirm-del { padding: 0.55rem 1.1rem; background: #b91c1c; border: none; border-radius: 8px; color: #fff; font-weight: 700; font-size: 0.88rem; cursor: pointer; transition: background 0.12s; }
+    .btn-confirm-del:hover { background: #dc2626; }
+    .btn-cancel-del { padding: 0.55rem 1.1rem; background: #21262d; border: 1px solid #30363d; border-radius: 8px; color: #8b949e; font-weight: 600; font-size: 0.88rem; cursor: pointer; transition: background 0.12s; }
+    .btn-cancel-del:hover { background: #2d333b; color: #e2e8f0; }
+
+    /* ── Toast ──────────────────────────────────────── */
+    .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); padding: 0.65rem 1.25rem; border-radius: 8px; font-size: 0.88rem; font-weight: 600; z-index: 200; opacity: 0; transition: opacity 0.2s; pointer-events: none; white-space: nowrap; }
+    .toast.show { opacity: 1; }
+    .toast.success { background: rgba(77,186,126,0.15); border: 1px solid #2d8653; color: #4dba7e; }
+    .toast.error   { background: rgba(248,113,113,0.12); border: 1px solid #f87171; color: #f87171; }
+
     @media (max-width: 640px) {
       .topbar, .content { padding-left: 1rem; padding-right: 1rem; }
       .stats-row { grid-template-columns: repeat(2, 1fr); }
@@ -160,8 +188,17 @@
             <div class="table-toolbar-left">
               <span class="table-heading">All Users</span>
               <span class="table-count-pill" id="tbl-count"></span>
+              <button class="btn-delete" id="btn-delete" onclick="confirmDelete()">🗑 Delete selected (<span id="sel-count">0</span>)</button>
             </div>
-            <input class="search-input" id="search" placeholder="Search email…" oninput="filter()" />
+            <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+              <select class="filter-select" id="filter-select" onchange="filter()">
+                <option value="all">All users</option>
+                <option value="free">Free</option>
+                <option value="pro">Pro</option>
+                <option value="week">This week</option>
+              </select>
+              <input class="search-input" id="search" placeholder="Search name or email…" oninput="filter()" />
+            </div>
           </div>
           <div class="table-wrap">
             <div id="tbl-body"><div class="no-data">Loading…</div></div>
@@ -206,16 +243,41 @@
     </main>
   </div>
 
+  <!-- ── Confirmation modal ────────────────────────── -->
+  <div class="modal-overlay" id="del-modal">
+    <div class="modal-box">
+      <div class="modal-title">Delete users?</div>
+      <div class="modal-body" id="del-modal-body"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel-del" onclick="closeModal()">Cancel</button>
+        <button class="btn-confirm-del" onclick="executeDelete()">Yes, delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Toast ─────────────────────────────────────── -->
+  <div class="toast" id="toast"></div>
 
   <script>
     let allUsers    = [];
     let allFeedback = [];
+    let selectedIds = new Set();
 
     /* ── Helpers ───────────────────────────────────── */
     const $ = id => document.getElementById(id);
     const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const key = () => sessionStorage.getItem('ra_admin') || '';
     const fmtDate = ts => ts ? new Date(ts).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+
+    /* ── Toast ─────────────────────────────────────── */
+    let _toastTimer;
+    function showToast(msg, type = 'success') {
+      const t = $('toast');
+      t.textContent = msg;
+      t.className = 'toast ' + type + ' show';
+      clearTimeout(_toastTimer);
+      _toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+    }
 
     /* ── Tabs ──────────────────────────────────────── */
     function switchTab(name) {
@@ -338,26 +400,64 @@
       $('s-free').textContent    = s.free;
     }
 
+    function updateSelectionUI() {
+      const n = selectedIds.size;
+      $('sel-count').textContent = n;
+      $('btn-delete').style.display = n > 0 ? 'inline-flex' : 'none';
+    }
+
+    function toggleRow(id, checked) {
+      checked ? selectedIds.add(id) : selectedIds.delete(id);
+      updateSelectionUI();
+      // sync select-all checkbox
+      const visible = Array.from($('tbl-body').querySelectorAll('input[type="checkbox"][data-id]'));
+      $('cb-all').indeterminate = false;
+      if (!visible.length) { $('cb-all').checked = false; return; }
+      const checkedCount = visible.filter(c => c.checked).length;
+      if (checkedCount === 0)             { $('cb-all').checked = false; }
+      else if (checkedCount === visible.length) { $('cb-all').checked = true; }
+      else { $('cb-all').indeterminate = true; }
+    }
+
+    function toggleAll(checked) {
+      $('tbl-body').querySelectorAll('input[type="checkbox"][data-id]').forEach(cb => {
+        cb.checked = checked;
+        checked ? selectedIds.add(cb.dataset.id) : selectedIds.delete(cb.dataset.id);
+      });
+      updateSelectionUI();
+    }
+
     function renderTable(users) {
       $('tbl-count').textContent = users.length + ' user' + (users.length !== 1 ? 's' : '');
       if (!users.length) { $('tbl-body').innerHTML = '<div class="no-data">No users found.</div>'; return; }
       $('tbl-body').innerHTML = `
         <table>
           <thead><tr>
-            <th>Email</th><th>Status</th><th>Plan</th>
-            <th>Renews / Expires</th><th>Entries</th><th>Joined</th>
+            <th class="cb-cell"><input type="checkbox" id="cb-all" onchange="toggleAll(this.checked)" title="Select all" /></th>
+            <th>Full Name</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Joined</th>
+            <th>Last Active</th>
+            <th>Entries</th>
           </tr></thead>
           <tbody>
-            ${users.map(u => `<tr>
-              <td class="td-email">${esc(u.email)}</td>
-              <td>${statusBadge(u)}</td>
-              <td>${esc(u.plan.toUpperCase())}</td>
-              <td>${fmtDate(u.subscriptionExpiry)}</td>
-              <td>${u.entryCount}</td>
-              <td>${fmtDate(u.createdAt)}</td>
-            </tr>`).join('')}
+            ${users.map(u => {
+              const name = [u.firstName, u.lastName].filter(Boolean).join(' ') || '<em style="color:#8b949e">—</em>';
+              const checked = selectedIds.has(u.id) ? 'checked' : '';
+              return `<tr>
+                <td class="cb-cell"><input type="checkbox" data-id="${esc(u.id)}" ${checked} onchange="toggleRow('${esc(u.id)}', this.checked)" /></td>
+                <td style="white-space:nowrap">${name}</td>
+                <td class="td-email">${esc(u.email)}</td>
+                <td>${statusBadge(u)}</td>
+                <td style="white-space:nowrap">${fmtDate(u.createdAt)}</td>
+                <td style="white-space:nowrap">${fmtDate(u.lastActive)}</td>
+                <td>${u.entryCount}</td>
+              </tr>`;
+            }).join('')}
           </tbody>
         </table>`;
+      updateSelectionUI();
     }
 
     function showDashboard(data) {
@@ -365,13 +465,23 @@
       $('shell').style.display = 'flex';
       allUsers = data.users;
       renderStats(data.stats);
-      renderTable(allUsers);
+      filter();
     }
 
     /* ── Actions ───────────────────────────────────── */
     function filter() {
-      const q = $('search').value.toLowerCase();
-      renderTable(q ? allUsers.filter(u => u.email.toLowerCase().includes(q)) : allUsers);
+      const q    = ($('search')?.value || '').toLowerCase();
+      const seg  = $('filter-select')?.value || 'all';
+      const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      let list = allUsers;
+      if (seg === 'free')  list = list.filter(u => !u.paid);
+      if (seg === 'pro')   list = list.filter(u => u.paid);
+      if (seg === 'week')  list = list.filter(u => u.createdAt >= weekAgo);
+      if (q) list = list.filter(u => {
+        const name = [u.firstName, u.lastName].filter(Boolean).join(' ').toLowerCase();
+        return u.email.toLowerCase().includes(q) || name.includes(q);
+      });
+      renderTable(list);
     }
 
     async function refresh() {
@@ -380,6 +490,33 @@
         allFeedback = [];
         if ($('tab-feedback').classList.contains('active')) loadFeedback();
       } catch { alert('Failed to refresh. You may need to sign in again.'); }
+    }
+
+    /* ── Delete flow ───────────────────────────────── */
+    function confirmDelete() {
+      if (!selectedIds.size) return;
+      const n = selectedIds.size;
+      $('del-modal-body').textContent =
+        `You are about to delete ${n} user${n !== 1 ? 's' : ''}. This cannot be undone. Are you sure?`;
+      $('del-modal').classList.add('open');
+    }
+    function closeModal() { $('del-modal').classList.remove('open'); }
+
+    async function executeDelete() {
+      closeModal();
+      const ids = [...selectedIds];
+      try {
+        const res  = await fetch('/api/admin/users', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key() },
+          body: JSON.stringify({ ids })
+        });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.error || 'Delete failed.', 'error'); return; }
+        selectedIds.clear();
+        showToast(`${data.deleted} user${data.deleted !== 1 ? 's' : ''} deleted successfully`, 'success');
+        showDashboard(await fetchData());
+      } catch { showToast('Network error — delete may have failed.', 'error'); }
     }
 
     function signOut() {
