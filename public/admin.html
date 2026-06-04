@@ -85,6 +85,11 @@
     .fb-detail td { white-space: normal; font-size: 0.82rem; line-height: 1.65; color: #c9d1d9; }
     .legacy-note { margin-bottom: 1rem; padding: 0.6rem 1rem; background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.3); border-radius: 8px; font-size: 0.8rem; color: #d29922; }
 
+    /* ── Plan selector ─────────────────────────────── */
+    .plan-select { padding: 0.25rem 0.5rem; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e2e8f0; font-size: 0.76rem; font-weight: 600; cursor: pointer; outline: none; transition: border-color 0.12s; }
+    .plan-select:focus { border-color: #4dba7e; }
+    .plan-select.saving { opacity: 0.5; pointer-events: none; }
+
     /* ── Checkbox ───────────────────────────────────── */
     .cb-cell { width: 2.5rem; text-align: center; padding: 0.72rem 0.5rem !important; }
     input[type="checkbox"] { width: 1rem; height: 1rem; accent-color: #4dba7e; cursor: pointer; }
@@ -437,19 +442,28 @@
             <th>Full Name</th>
             <th>Email</th>
             <th>Status</th>
+            <th>Plan</th>
             <th>Joined</th>
             <th>Last Active</th>
             <th>Entries</th>
           </tr></thead>
           <tbody>
             ${users.map(u => {
-              const name = [u.firstName, u.lastName].filter(Boolean).join(' ') || '<em style="color:#8b949e">—</em>';
+              const name    = [u.firstName, u.lastName].filter(Boolean).join(' ') || '<em style="color:#8b949e">—</em>';
               const checked = selectedIds.has(u.id) ? 'checked' : '';
+              const selPro  = u.paid ? 'selected' : '';
+              const selFree = !u.paid ? 'selected' : '';
               return `<tr>
                 <td class="cb-cell"><input type="checkbox" data-id="${esc(u.id)}" ${checked} onchange="toggleRow('${esc(u.id)}', this.checked)" /></td>
                 <td style="white-space:nowrap">${name}</td>
                 <td class="td-email">${esc(u.email)}</td>
-                <td>${statusBadge(u)}</td>
+                <td id="status-${esc(u.id)}">${statusBadge(u)}</td>
+                <td style="white-space:nowrap">
+                  <select class="plan-select" data-uid="${esc(u.id)}" onchange="changePlan(this)">
+                    <option value="free" ${selFree}>Free</option>
+                    <option value="pro"  ${selPro}>Pro</option>
+                  </select>
+                </td>
                 <td style="white-space:nowrap">${fmtDate(u.createdAt)}</td>
                 <td style="white-space:nowrap">${fmtDate(u.lastActive)}</td>
                 <td>${u.entryCount}</td>
@@ -458,6 +472,29 @@
           </tbody>
         </table>`;
       updateSelectionUI();
+    }
+
+    async function changePlan(sel) {
+      const uid  = sel.dataset.uid;
+      const plan = sel.value;
+      sel.classList.add('saving');
+      try {
+        const res  = await fetch(`/api/admin/users/${uid}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key() },
+          body: JSON.stringify({ plan })
+        });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.error || 'Update failed.', 'error'); sel.value = plan === 'pro' ? 'free' : 'pro'; return; }
+        // update the status badge in place without re-rendering the whole table
+        const statusCell = $('status-' + uid);
+        if (statusCell) statusCell.innerHTML = statusBadge(data.user);
+        // keep allUsers in sync so filter/re-render stays correct
+        const idx = allUsers.findIndex(u => u.id === uid);
+        if (idx !== -1) Object.assign(allUsers[idx], data.user);
+        showToast(`${data.user.email} switched to ${plan === 'pro' ? 'Pro' : 'Free'}`, 'success');
+      } catch { showToast('Network error — plan not updated.', 'error'); sel.value = plan === 'pro' ? 'free' : 'pro'; }
+      finally { sel.classList.remove('saving'); }
     }
 
     function showDashboard(data) {

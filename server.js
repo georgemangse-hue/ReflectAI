@@ -789,6 +789,27 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { users: rows, stats });
     }
 
+    if (method === 'PATCH' && url.startsWith('/api/admin/users/')) {
+      if (!requireAdmin(req, res)) return;
+      const userId = url.slice('/api/admin/users/'.length);
+      if (!userId) return sendJSON(res, 400, { error: 'Missing user ID.' });
+      const { plan } = await readBody(req);
+      if (plan !== 'free' && plan !== 'pro')
+        return sendJSON(res, 400, { error: 'plan must be "free" or "pro".' });
+
+      const users = readJSON(USERS_FILE);
+      const user  = users.find(u => u.id === userId);
+      if (!user) return sendJSON(res, 404, { error: 'User not found.' });
+
+      if (plan === 'pro') {
+        Object.assign(user, { plan: 'pro', paid: true, subscriptionStatus: 'active', subscriptionExpiry: null });
+      } else {
+        Object.assign(user, { plan: 'free', paid: false, subscriptionStatus: null, subscriptionExpiry: null });
+      }
+      writeJSON(USERS_FILE, users);
+      return sendJSON(res, 200, { user: userShape(user) });
+    }
+
     if (method === 'DELETE' && url === '/api/admin/users') {
       if (!requireAdmin(req, res)) return;
       const { ids } = await readBody(req);
