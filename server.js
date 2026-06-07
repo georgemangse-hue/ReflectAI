@@ -47,10 +47,9 @@ const GMAIL_APP_PASSWORD     = process.env.GMAIL_APP_PASSWORD     || '';
 const SMTP_USER              = process.env.SMTP_USER              || 'georgemangse@gmail.com';
 const EMAIL_FROM_NAME        = process.env.EMAIL_FROM_NAME        || 'ReflectAI by PremierLEADZ';
 const RESET_TTL              = 24 * 60 * 60 * 1000; // 24 hours
-const FREE_ENTRY_LIMIT          = 3;
-const FREE_WEEKLY_INSIGHT_LIMIT = 1;
-const FREE_GOAL_LIMIT           = 1;
-const FREE_CHECKIN_LIMIT        = 1;
+const TRIAL_DURATION_MS         = 30 * 24 * 60 * 60 * 1000; // 30 days
+const FREE_GOAL_LIMIT           = 2;  // post-trial free tier: 2 active goals
+const FREE_AI_EXCHANGES         = 3;  // post-trial free: 3 total exchanges (incl. initial reflect)
 
 // ----------------------------------------------------------------
 // African Cultural Context — proverbs, leader quotes, Nigerian themes
@@ -160,6 +159,25 @@ if (!fs.existsSync(RESETS_FILE))     fs.writeFileSync(RESETS_FILE,     '[]');
 if (!fs.existsSync(REFERRALS_FILE)) fs.writeFileSync(REFERRALS_FILE, '[]');
 if (!fs.existsSync(FEEDBACK_FILE))           fs.writeFileSync(FEEDBACK_FILE,           '[]');
 if (!fs.existsSync(FEEDBACK_RESPONSES_FILE)) fs.writeFileSync(FEEDBACK_RESPONSES_FILE, '[]');
+
+// Migration: ensure every user has a trial_start_date
+// - Paid Pro users: set to createdAt (irrelevant since getUserAccessLevel returns 'pro' first)
+// - Free users without a date: set to now, giving them 30 days from today
+(function migrateTrialDates() {
+  const users   = readJSON(USERS_FILE);
+  const now     = Date.now();
+  let changed   = 0;
+  users.forEach(u => {
+    if (!u.trial_start_date) {
+      u.trial_start_date = u.paid ? (u.createdAt || now) : now;
+      changed++;
+    }
+  });
+  if (changed > 0) {
+    writeJSON(USERS_FILE, users);
+    console.log(`  ✔  Migrated trial_start_date for ${changed} user(s)`);
+  }
+}());
 
 // One-time migration: copy old feedback.json records into feedback_responses.json
 (function migrateOldFeedback() {
@@ -322,6 +340,17 @@ function isSubscriptionActive(user) {
   return user.subscriptionExpiry > Date.now();  // active OR non-renewing (not yet expired)
 }
 
+// Returns 'pro' | 'trial' | 'free'
+// - 'pro':   active paid subscription
+// - 'trial': within 30-day free trial window (full Pro access)
+// - 'free':  trial expired, no active subscription (limited access)
+function getUserAccessLevel(user) {
+  if (isSubscriptionActive(user)) return 'pro';
+  const trialStart = user.trial_start_date || user.createdAt || 0;
+  if (trialStart && Date.now() < trialStart + TRIAL_DURATION_MS) return 'trial';
+  return 'free';
+}
+
 function requireAdmin(req, res) {
   const header = req.headers['authorization'];
   const key    = header?.startsWith('Bearer ') ? header.slice(7) : null;
@@ -344,10 +373,11 @@ function requirePaid(req, res) {
 }
 
 function requirePro(req, res) {
-  const user = requirePaid(req, res);
+  const user = requireAuth(req, res);
   if (!user) return null;
-  if (user.plan !== 'pro') {
-    sendJSON(res, 403, { error: 'This feature requires a Pro plan.', code: 'PRO_REQUIRED' });
+  const level = getUserAccessLevel(user);
+  if (level === 'free') {
+    sendJSON(res, 403, { error: 'This feature requires a Pro plan or an active trial.', code: 'PRO_REQUIRED' });
     return null;
   }
   return user;
@@ -357,6 +387,9 @@ function requirePro(req, res) {
    User helpers
 ================================================================ */
 function userShape(u) {
+  const trialStart  = u.trial_start_date || u.createdAt || 0;
+  const trialEnd    = trialStart + TRIAL_DURATION_MS;
+  const accessLevel = getUserAccessLevel(u);
   return {
     id:                 u.id,
     email:              u.email,
@@ -366,7 +399,10 @@ function userShape(u) {
     paid:               u.paid === true,
     subscriptionStatus: u.subscriptionStatus  || null,
     subscriptionExpiry: u.subscriptionExpiry  || null,
-    createdAt:          u.createdAt
+    createdAt:          u.createdAt,
+    trial_start_date:   trialStart,
+    trial_end_date:     trialEnd,
+    access_level:       accessLevel   // 'pro' | 'trial' | 'free'
   };
 }
 
@@ -764,6 +800,12 @@ const server = http.createServer(async (req, res) => {
         const userSessions = sessions.filter(s => s.userId === u.id);
         const lastSession  = userSessions.reduce((max, s) => Math.max(max, s.expiresAt - SESSION_TTL), 0);
         const lastActive   = Math.max(lastEntry, lastSession) || null;
+        const accessLevel  = getUserAccessLevel(u);
+        const trialStart   = u.trial_start_date || u.createdAt || 0;
+        const trialEnd     = trialStart + TRIAL_DURATION_MS;
+        const trialDaysLeft = accessLevel === 'trial'
+          ? Math.max(0, Math.ceil((trialEnd - now) / 86400000))
+          : 0;
         return {
           id:                 u.id,
           email:              u.email,
@@ -776,15 +818,47 @@ const server = http.createServer(async (req, res) => {
           subscriptionCode:   u.subscriptionCode    || null,
           entryCount:         entries.length,
           createdAt:          u.createdAt,
-          lastActive:         lastActive || u.createdAt
+          lastActive:         lastActive || u.createdAt,
+          access_level:       accessLevel,
+          trial_start_date:   trialStart || null,
+          trial_end_date:     trialEnd   || null,
+          trialDaysLeft
         };
       });
+      // Trial stats
+      const allUsers = readJSON(USERS_FILE);
+      const trialUsers = allUsers.filter(u => {
+        if (u.paid && isSubscriptionActive(u)) return false; // skip paying users
+        const ts = u.trial_start_date || u.createdAt || 0;
+        return ts && Date.now() < ts + TRIAL_DURATION_MS;
+      });
+      const trialDaysRemaining = trialUsers.length
+        ? trialUsers.reduce((sum, u) => {
+            const ts  = u.trial_start_date || u.createdAt || Date.now();
+            const rem = Math.max(0, Math.ceil((ts + TRIAL_DURATION_MS - Date.now()) / 86400000));
+            return sum + rem;
+          }, 0) / trialUsers.length
+        : 0;
+      const postTrialFree = allUsers.filter(u => {
+        if (u.paid && isSubscriptionActive(u)) return false;
+        const ts = u.trial_start_date || u.createdAt || 0;
+        return !ts || Date.now() >= ts + TRIAL_DURATION_MS;
+      });
+      const paidCount  = rows.filter(u => u.paid && (!u.subscriptionExpiry || (u.subscriptionStatus === 'active' && u.subscriptionExpiry > now))).length;
+      const conversion = trialUsers.length + paidCount > 0
+        ? Math.round((paidCount / (trialUsers.length + paidCount + postTrialFree.length)) * 100)
+        : 0;
+
       const stats = {
-        total:       rows.length,
-        active:      rows.filter(u => u.paid && (!u.subscriptionExpiry || (u.subscriptionStatus === 'active' && u.subscriptionExpiry > now))).length,
-        nonRenewing: rows.filter(u => u.subscriptionStatus === 'non-renewing' && (u.subscriptionExpiry || 0) > now).length,
-        expired:     rows.filter(u => u.paid && u.subscriptionExpiry && u.subscriptionExpiry <= now).length,
-        free:        rows.filter(u => !u.paid).length
+        total:           rows.length,
+        active:          paidCount,
+        nonRenewing:     rows.filter(u => u.subscriptionStatus === 'non-renewing' && (u.subscriptionExpiry || 0) > now).length,
+        expired:         rows.filter(u => u.paid && u.subscriptionExpiry && u.subscriptionExpiry <= now).length,
+        free:            rows.filter(u => !u.paid).length,
+        onTrial:         trialUsers.length,
+        trialDaysAvg:    Math.round(trialDaysRemaining),
+        postTrialFree:   postTrialFree.length,
+        conversionRate:  conversion
       };
       return sendJSON(res, 200, { users: rows, stats });
     }
@@ -885,10 +959,12 @@ const server = http.createServer(async (req, res) => {
         : null;
 
       const salt = crypto.randomBytes(32).toString('hex');
+      const now  = Date.now();
       const user = {
         id: generateId(), email: email.toLowerCase().trim(),
         passwordHash: hashPassword(password, salt), salt,
-        plan: 'free', paid: false, createdAt: Date.now(),
+        plan: 'free', paid: false, createdAt: now,
+        trial_start_date: now,   // 30-day Pro trial starts immediately
         referralCode:   generateReferralCode(),
         referredBy:     referrer?.id || null,
         referralCredits: 0
@@ -1636,13 +1712,6 @@ const server = http.createServer(async (req, res) => {
 
       const entries  = readJSON(entriesFile(user.id));
       const isUpdate = entries.some(e => e.date === date);
-      if (!isUpdate && !isSubscriptionActive(user) && entries.length >= FREE_ENTRY_LIMIT) {
-        return sendJSON(res, 403, {
-          error: 'You have reached your free entry limit. Subscribe to keep journaling.',
-          code: 'ENTRY_LIMIT_REACHED',
-          freeLimit: FREE_ENTRY_LIMIT
-        });
-      }
 
       const entry = {
         id: date, date, text: text.trim(),
@@ -1855,10 +1924,13 @@ Available categories (pick the 3 that best fit): Feelings, Mindset, Growth, Next
         return sendJSON(res, 400, { error: 'Missing or too-short conversation history.' });
 
       // Enforce per-plan exchange limits (history starts at 2; each exchange adds 2 entries + 1 pending user msg)
-      // Exchange 1 = initial /api/reflect call; coach handles exchanges 2-6 (free) or 2-10 (pro)
+      // Exchange 1 = initial /api/reflect call; coach handles exchanges 2-N
+      // pro/trial: 10 total (9 coach), free: 3 total (2 coach)
       const exchangeRequested = (messages.length - 1) / 2;
-      const isPro = isSubscriptionActive(user) && user.plan === 'pro';
-      const coachLimit = isPro ? 9 : 5;
+      const accessLevel = getUserAccessLevel(user);
+      const isPro       = accessLevel === 'pro' || accessLevel === 'trial';
+      const coachLimit  = isPro ? 9 : (FREE_AI_EXCHANGES - 1); // 9 or 2
+      const totalExch   = coachLimit + 1;                       // 10 or 3
       if (exchangeRequested > coachLimit)
         return sendJSON(res, 403, { error: `You've reached the session limit.`, code: 'COACH_LIMIT_REACHED' });
 
@@ -1866,12 +1938,12 @@ Available categories (pick the 3 that best fit): Feelings, Mindset, Growth, Next
       let closingGuidance = '';
       if (exchangeRequested === coachLimit) {
         closingGuidance = isPro
-          ? `\n\nIMPORTANT — THIS IS THE FINAL EXCHANGE (Exchange 10 of 10 for this Pro plan session). Deliver a complete and warm closing:\n1. A comprehensive summary of all key insights from this entire session\n2. Three specific, actionable growth steps for the week ahead (number them clearly)\n3. A personalised encouragement grounded in something specific they shared today\n4. End with exactly: "See you in your next entry 🌱"\nMake this feel like a real coaching session closing — complete, warm, and human.`
-          : `\n\nIMPORTANT — THIS IS THE FINAL EXCHANGE (Exchange 6 of 6 for this Free plan session). Deliver a warm closing:\n1. A 2-3 sentence summary of the key insight from this session\n2. One specific, actionable growth step to take before their next journal entry\n3. An encouraging closing message\n4. At the very end, gently and warmly add: "Want to go deeper? Upgrade to Pro for extended coaching sessions" — not as a sales pitch, just a genuine invitation.\nKeep the entire response warm and coach-like, never clinical.`;
-      } else if (exchangeRequested === coachLimit - 1) {
+          ? `\n\nIMPORTANT — THIS IS THE FINAL EXCHANGE (Exchange ${totalExch} of ${totalExch} for this Pro plan session). Deliver a complete and warm closing:\n1. A comprehensive summary of all key insights from this entire session\n2. Three specific, actionable growth steps for the week ahead (number them clearly)\n3. A personalised encouragement grounded in something specific they shared today\n4. End with exactly: "See you in your next entry 🌱"\nMake this feel like a real coaching session closing — complete, warm, and human.`
+          : `\n\nIMPORTANT — THIS IS THE FINAL EXCHANGE (Exchange ${totalExch} of ${totalExch} for this free plan session). Deliver a warm closing:\n1. A 2-3 sentence summary of the key insight from this session\n2. One specific, actionable growth step to take before their next journal entry\n3. An encouraging closing message\n4. At the very end, gently and warmly add: "Want to go deeper? Upgrade to Pro for extended coaching sessions — ₦3,000/month." — not as a sales pitch, just a genuine invitation.\nKeep the entire response warm and coach-like, never clinical.`;
+      } else if (exchangeRequested === coachLimit - 1 && coachLimit > 1) {
         closingGuidance = isPro
-          ? `\n\nIMPORTANT — This is Exchange 9 of 10 (penultimate for this Pro plan session). Begin warmly bringing the session toward its close. Open your response with something like: "We've covered a lot of ground today — let's bring this session to a meaningful close..." Then reflect on what has been most significant in this conversation and ask one final question that will help them crystallise their insights before the final exchange.`
-          : `\n\nIMPORTANT — This is Exchange 5 of 6 (penultimate for this Free plan session). Start gently bringing the session toward a close. Open with something like: "We're coming to the end of today's reflection — let's bring this together..." Then reflect on what has been most meaningful and ask one last meaningful question to help crystallise their key insight.`;
+          ? `\n\nIMPORTANT — This is Exchange ${totalExch - 1} of ${totalExch} (penultimate for this Pro plan session). Begin warmly bringing the session toward its close. Open your response with something like: "We've covered a lot of ground today — let's bring this session to a meaningful close..." Then reflect on what has been most significant in this conversation and ask one final question that will help them crystallise their insights before the final exchange.`
+          : `\n\nIMPORTANT — This is Exchange ${totalExch - 1} of ${totalExch} (penultimate for this session). Start gently bringing the session toward a close. Open with something like: "We're coming to the end of today's reflection — let's bring this together..." Then reflect on what has been most meaningful and ask one last meaningful question to help crystallise their key insight.`;
       }
 
       // Cap history to keep context manageable: always keep first 2 (entry + opening prompt), then last 10
@@ -1909,11 +1981,21 @@ Rules:
     if (method === 'POST' && url === '/api/weekly-insight') {
       const user = requireAuth(req, res);
       if (!user) return;
-      if (!isSubscriptionActive(user) && (user.weeklyInsightTrialUsed || 0) >= FREE_WEEKLY_INSIGHT_LIMIT) {
-        return sendJSON(res, 403, {
-          error: 'You\'ve used your free weekly insight preview. Subscribe for unlimited access.',
-          code: 'PRO_TRIAL_EXHAUSTED'
-        });
+
+      const insightLevel = getUserAccessLevel(user);
+      if (insightLevel === 'free') {
+        // Post-trial free: 1 insight per calendar month
+        const now          = new Date();
+        const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        if (user.insightLastMonth === currentMonth) {
+          const nextMonth   = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+          const nextDateStr = nextMonth.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+          return sendJSON(res, 403, {
+            error: `Your next insight is available on ${nextDateStr}. Upgrade to Pro for weekly insights.`,
+            code:  'INSIGHT_MONTHLY_LIMIT',
+            nextAvailableDate: nextMonth.getTime()
+          });
+        }
       }
       if (!API_KEY) return sendJSON(res, 500, { error: 'ANTHROPIC_API_KEY is not configured.' });
 
@@ -1936,8 +2018,10 @@ Structure:
 Voice: second person only ("you", "your"). Flowing prose, no bullets or headers. ~180–230 words. Let encouragement come from specificity, not cheerleading. Never say "amazing" or "you're doing great". Feel warm and culturally alive — not generic Western self-help.`;
 
       const result = await callClaude([{ role: 'user', content: `Here are my journal entries from this past week:\n\n${formatted}` }], systemPrompt);
-      if (!isSubscriptionActive(user)) {
-        updateUser(user.id, { weeklyInsightTrialUsed: (user.weeklyInsightTrialUsed || 0) + 1 });
+      if (insightLevel === 'free') {
+        const now          = new Date();
+        const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        updateUser(user.id, { insightLastMonth: currentMonth });
       }
       return sendJSON(res, 200, { insight: result.content[0].text });
     }
@@ -1954,12 +2038,12 @@ Voice: second person only ("you", "your"). Flowing prose, no bullets or headers.
     if (method === 'POST' && url === '/api/goals') {
       const user = requireAuth(req, res);
       if (!user) return;
-      if (!isSubscriptionActive(user)) {
-        const existingGoals = readJSON(goalsFile(user.id));
+      if (getUserAccessLevel(user) === 'free') {
+        const existingGoals = readJSON(goalsFile(user.id)).filter(g => g.status !== 'completed');
         if (existingGoals.length >= FREE_GOAL_LIMIT) {
           return sendJSON(res, 403, {
-            error: 'Free accounts can set 1 goal. Subscribe to track unlimited goals.',
-            code: 'PRO_TRIAL_EXHAUSTED'
+            error: `You've reached the free plan limit of ${FREE_GOAL_LIMIT} active goals. Upgrade to Pro for unlimited goals.`,
+            code: 'GOAL_LIMIT_REACHED'
           });
         }
       }
@@ -2017,10 +2101,10 @@ Voice: second person only ("you", "your"). Flowing prose, no bullets or headers.
     if (method === 'POST' && checkinMatch) {
       const user = requireAuth(req, res);
       if (!user) return;
-      if (!isSubscriptionActive(user) && (user.goalCheckinTrialUsed || 0) >= FREE_CHECKIN_LIMIT) {
+      if (getUserAccessLevel(user) === 'free') {
         return sendJSON(res, 403, {
-          error: 'You\'ve used your free AI check-in. Subscribe for unlimited check-ins.',
-          code: 'PRO_TRIAL_EXHAUSTED'
+          error: 'AI goal check-ins require an active Pro plan or trial. Upgrade to Pro for unlimited check-ins.',
+          code: 'PRO_REQUIRED'
         });
       }
       if (!API_KEY) return sendJSON(res, 500, { error: 'ANTHROPIC_API_KEY is not configured.' });
@@ -2041,9 +2125,6 @@ Your check-in should note any specific evidence from the journal entries that re
 
       const userMsg = `My goal: "${goal.title}"${goal.description ? `\nDetails: ${goal.description}` : ''}${goal.targetDate ? `\nTarget date: ${goal.targetDate}` : ''}\n\nRecent journal entries:\n\n${formatted}`;
       const result  = await callClaude([{ role: 'user', content: userMsg }], systemPrompt);
-      if (!isSubscriptionActive(user)) {
-        updateUser(user.id, { goalCheckinTrialUsed: (user.goalCheckinTrialUsed || 0) + 1 });
-      }
       return sendJSON(res, 200, { checkin: result.content[0].text });
     }
 
@@ -2053,7 +2134,18 @@ Your check-in should note any specific evidence from the journal entries that re
     if (method === 'GET' && url === '/api/mood-logs') {
       const user = requireAuth(req, res);
       if (!user) return;
-      return sendJSON(res, 200, { logs: readJSON(moodLogsFile(user.id)) });
+      const allLogs    = readJSON(moodLogsFile(user.id));
+      const moodLevel  = getUserAccessLevel(user);
+      if (moodLevel === 'free') {
+        // Free tier: only last 7 days visible
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 6); // include today + 6 prior days
+        const cutoffISO   = cutoff.toISOString().split('T')[0];
+        const visibleLogs = allLogs.filter(l => l.date >= cutoffISO);
+        const hasOlder    = allLogs.some(l => l.date < cutoffISO);
+        return sendJSON(res, 200, { logs: visibleLogs, moodRestricted: true, hasOlderData: hasOlder });
+      }
+      return sendJSON(res, 200, { logs: allLogs, moodRestricted: false, hasOlderData: false });
     }
 
     if (method === 'POST' && url === '/api/mood-logs') {

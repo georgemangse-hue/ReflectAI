@@ -2300,6 +2300,14 @@ footer {
   cursor: pointer;
 }
 
+.payment-trial-offer {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1D9E75;
+  margin: 0 0 0.5rem;
+  text-align: center;
+}
+
 .payment-features {
   list-style: none;
   padding: 0;
@@ -2310,20 +2318,19 @@ footer {
 .payment-features li {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.5rem 0;
+  gap: 12px;
+  padding: 6px 0;
   font-size: 0.9rem;
   color: var(--text);
   border-bottom: 1px solid var(--border-light);
+  line-height: 1.4;
 }
 
 .payment-features li:last-child { border-bottom: none; }
 
-.payment-features li > span:first-child {
-  font-size: 1.05rem;
-  width: 1.4rem;
+.feat-icon {
   flex-shrink: 0;
-  text-align: center;
+  display: block;
 }
 
 .payment-options {
@@ -3506,4 +3513,193 @@ footer {
   color: var(--text-muted);
   font-size: 0.9rem;
   padding: 1rem 0;
+}
+
+/* ================================================================
+   TRIAL BANNER
+================================================================ */
+.trial-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--primary-light, #e8f5ee);
+  border-bottom: 1px solid var(--primary, #3a8f65);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--primary, #3a8f65);
+  text-align: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.trial-banner.trial-amber {
+  background: #fff8e6;
+  border-bottom-color: #d48f00;
+  color: #9a6700;
+}
+.trial-banner.trial-red {
+  background: #fff0f0;
+  border-bottom-color: #e55353;
+  color: #c0392b;
+  font-size: 0.86rem;
+}
+[data-theme="dark"] .trial-banner {
+  background: rgba(58,143,101,0.15);
+  color: #4dba7e;
+  border-bottom-color: rgba(58,143,101,0.4);
+}
+[data-theme="dark"] .trial-banner.trial-amber {
+  background: rgba(212,143,0,0.12);
+  color: #f5c842;
+  border-bottom-color: rgba(212,143,0,0.35);
+}
+[data-theme="dark"] .trial-banner.trial-red {
+  background: rgba(229,83,83,0.12);
+  color: #f87171;
+  border-bottom-color: rgba(229,83,83,0.35);
+}
+.trial-banner-upgrade {
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  padding: 0.18rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.trial-banner-upgrade:hover {
+  background: rgba(0,0,0,0.06);
+}
+
+/* ================================================================
+   TRIAL EXPIRED MODAL
+================================================================ */
+.trial-expired-card {
+  text-align: center;
+  max-width: 400px;
+  padding: 2.5rem 2rem;
+}
+.trial-expired-icon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+.trial-expired-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 0.75rem;
+  line-height: 1.3;
+}
+.trial-expired-body {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+.trial-expired-upgrade {
+  width: 100%;
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  padding: 0.8rem;
+}
+.trial-expired-free {
+  width: 100%;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* ================================================================
+   MOOD HISTORY UPGRADE OVERLAY
+================================================================ */
+.mood-history-upgrade {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 70px;
+  background: linear-gradient(to bottom, transparent, var(--bg, #fff) 75%);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.75rem;
+  padding-bottom: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.mood-history-upgrade button {
+  pointer-events: all;
+}
+[data-theme="dark"] .mood-history-upgrade {
+  background: linear-gradient(to bottom, transparent, var(--bg-dark, #1a1a2e) 75%);
+}
+
+/* ================================================================
+   UPGRADE PROMPT TOAST (warm, non-aggressive)
+================================================================ */
+.upgrade-prompt-toast {
+  position: fixed;
+  bottom: 5rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #cde5d8);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+  width: min(360px, 92vw);
+  z-index: 300;
+  opacity: 0;
+  transition: opacity 0.25s, transform 0.25s;
+}
+.upgrade-prompt-toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.upgrade-prompt-msg {
+  font-size: 0.88rem;
+  color: var(--text);
+  line-height: 1.5;
+  margin-bottom: 0.75rem;
+}
+.upgrade-prompt-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.upgrade-prompt-btn {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+/* ================================================================
+   TRIAL NAV BADGE
+================================================================ */
+#nav-plan-badge.trial {
+  background: rgba(212,143,0,0.15);
+  color: #9a6700;
+  border-color: rgba(212,143,0,0.4);
+}
+[data-theme="dark"] #nav-plan-badge.trial {
+  background: rgba(245,200,66,0.14);
+  color: #f5c842;
+  border-color: rgba(245,200,66,0.35);
+}
+#dropdown-plan-badge.trial {
+  background: rgba(212,143,0,0.15);
+  color: #9a6700;
+}
+[data-theme="dark"] #dropdown-plan-badge.trial {
+  background: rgba(245,200,66,0.12);
+  color: #f5c842;
 }

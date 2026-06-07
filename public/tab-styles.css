@@ -5,7 +5,8 @@
    Desktop (≥ 768px): fixed left sidebar
 ================================================================ */
 :root {
-  --app-header-h: 56px;
+  --app-header-h:   56px;
+  --trial-banner-h: 0px;   /* set to 39px via JS when banner is shown */
   --tab-nav-h:    65px;
   --sidebar-w:    180px;
   --active-green: #1D9E75;
@@ -15,7 +16,8 @@
 /* ── Top header ─────────────────────────────────────────────── */
 .app-header {
   position: fixed;
-  top: 0; left: 0; right: 0;
+  top: var(--trial-banner-h); /* shifts down when trial banner is visible */
+  left: 0; right: 0;
   height: var(--app-header-h);
   z-index: 100;
   border-bottom: 1px solid var(--border-light);
@@ -53,7 +55,7 @@
 /* Base (mobile-first): offset by header top + bottom nav bottom */
 .tab-main {
   position: fixed;
-  top: var(--app-header-h);
+  top: calc(var(--app-header-h) + var(--trial-banner-h));
   bottom: calc(var(--tab-nav-h) + env(safe-area-inset-bottom, 0px));
   left: 0;
   right: 0;
@@ -960,7 +962,7 @@
 
   /* ── Sidebar shell ── */
   .bottom-nav {
-    top: 0; left: 0; bottom: 0; right: auto;
+    top: var(--trial-banner-h); left: 0; bottom: 0; right: auto;
     width: var(--sidebar-w);
     height: auto; /* override nav { height: 62px } from style.css */
     flex-direction: column;

@@ -62,9 +62,14 @@ const state = {
   countryCode:         null,  // set by detectCountry() on load
   countryOverride:     null,  // set when user clicks "Switch currency"
   userPlan:            'free', // 'free' or 'pro'
+  accessLevel:         'free', // 'pro' | 'trial' | 'free'
+  moodRestricted:      false,  // true when free-tier mood history is limited to 7 days
+  moodHasOlderData:    false,
   coachEntry:          '',    // journal text for the current coach session
   coachSessions:       {},    // keyed by prompt index: { history: [{role,content}] }
-  onboarding:          { active: false, step: 0 }
+  onboarding:          { active: false, step: 0 },
+  // per-session upgrade prompts: track which features have already shown a prompt this session
+  upgradeShown:        new Set()
 };
 
 
@@ -144,9 +149,19 @@ async function api(method, path, body) {
   const data = await res.json().catch(() => ({}));
 
   if (res.status === 401) { clearAuthState(); showAuthOverlay(); return null; }
-  if (res.status === 403 && (data.code === 'PAYMENT_REQUIRED' || data.code === 'SUBSCRIPTION_EXPIRED' || data.code === 'ENTRY_LIMIT_REACHED' || data.code === 'PRO_TRIAL_EXHAUSTED')) {
+  if (res.status === 403 && (data.code === 'PAYMENT_REQUIRED' || data.code === 'SUBSCRIPTION_EXPIRED')) {
     showPaymentWall();
     return null;
+  }
+  if (res.status === 403 && data.code === 'GOAL_LIMIT_REACHED') {
+    if (!state.upgradeShown.has('goals')) {
+      state.upgradeShown.add('goals');
+      showUpgradePrompt(data.error || "You've reached the free plan goal limit.", 'goals');
+    }
+    return null;
+  }
+  if (res.status === 403 && data.code === 'INSIGHT_MONTHLY_LIMIT') {
+    return { _insightMonthlyLimit: true, error: data.error, nextAvailableDate: data.nextAvailableDate };
   }
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
@@ -292,39 +307,103 @@ async function handleLogout() {
 }
 
 function applyUserUI(user) {
-  const isPro = user.plan === 'pro';
-  state.userPlan = user.plan || 'free';
+  const accessLevel = user.access_level || (user.plan === 'pro' ? 'pro' : 'free');
+  const isPro       = accessLevel === 'pro';
+  const isTrial     = accessLevel === 'trial';
+  state.userPlan    = user.plan || 'free';
+  state.accessLevel = accessLevel;
+
   document.getElementById('nav-user').classList.remove('hidden');
   const navBadge = document.getElementById('nav-plan-badge');
-  navBadge.textContent = isPro ? 'PRO' : 'FREE';
-  navBadge.classList.toggle('pro', isPro);
+  if (isPro)    { navBadge.textContent = 'PRO';   navBadge.classList.add('pro');    }
+  else if (isTrial) { navBadge.textContent = 'TRIAL'; navBadge.classList.add('trial'); }
+  else          { navBadge.textContent = 'FREE';  navBadge.classList.remove('pro'); }
+
   document.getElementById('dropdown-email').textContent = user.email;
   const dropBadge = document.getElementById('dropdown-plan-badge');
-  dropBadge.textContent = isPro ? 'PRO' : 'FREE';
-  dropBadge.classList.toggle('pro', isPro);
-  document.getElementById('dropdown-plan-label').textContent = isPro ? 'Pro plan' : 'Free plan';
-  document.getElementById('dropdown-upgrade-btn').classList.toggle('hidden', isPro);
+  if (isPro)    { dropBadge.textContent = 'PRO';   dropBadge.classList.add('pro');    }
+  else if (isTrial) { dropBadge.textContent = 'TRIAL'; dropBadge.classList.add('trial'); }
+  else          { dropBadge.textContent = 'FREE';  dropBadge.classList.remove('pro'); }
+
+  document.getElementById('dropdown-plan-label').textContent =
+    isPro ? 'Pro plan' : isTrial ? 'Pro Trial (30 days)' : 'Free plan';
+  document.getElementById('dropdown-upgrade-btn').classList.toggle('hidden', isPro || isTrial);
   applySubscriptionUI(user);
   updateProfileUI(user);
+  applyProGates(isPro || isTrial);
 
-  applyProGates(isPro);
+  // Trial banner
+  renderTrialBanner(user);
+
+  // Show one-time trial expiry modal
+  if (accessLevel === 'free' && !user.paid) {
+    maybeShowTrialExpiredModal(user);
+  }
 }
 
-function applyProGates(isPro) {
+const TRIAL_EXPIRED_KEY = 'reflectai_trial_expired_shown';
+
+function renderTrialBanner(user) {
+  const banner = document.getElementById('trial-banner');
+  if (!banner) return;
+
+  if (user.access_level !== 'trial') {
+    banner.classList.add('hidden');
+    document.documentElement.style.setProperty('--trial-banner-h', '0px');
+    return;
+  }
+
+  const trialEnd = user.trial_end_date;
+  const daysLeft = trialEnd ? Math.max(0, Math.ceil((trialEnd - Date.now()) / 86400000)) : 0;
+  const textEl   = document.getElementById('trial-banner-text');
+
+  banner.classList.remove('hidden', 'trial-amber', 'trial-red');
+  if (textEl) textEl.textContent = `🌿 Pro Trial — ${daysLeft} day${daysLeft === 1 ? '' : 's'} remaining`;
+
+  if (daysLeft <= 3) {
+    banner.classList.add('trial-red');
+  } else if (daysLeft <= 7) {
+    banner.classList.add('trial-amber');
+  }
+
+  // Measure the rendered height and set the CSS variable so header/content shift down
+  requestAnimationFrame(() => {
+    const h = banner.getBoundingClientRect().height;
+    document.documentElement.style.setProperty('--trial-banner-h', Math.round(h) + 'px');
+  });
+}
+
+function maybeShowTrialExpiredModal(user) {
+  // Only show once per browser (user has seen the trial and it just ended)
+  if (localStorage.getItem(TRIAL_EXPIRED_KEY)) return;
+  // Only show if the trial actually existed (trial_start_date set) and just expired
+  if (!user.trial_start_date && !user.trial_end_date) return;
+  // Mark as shown so it doesn't repeat
+  localStorage.setItem(TRIAL_EXPIRED_KEY, '1');
+  const modal = document.getElementById('trial-expired-modal');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeTrialExpiredModal() {
+  const modal = document.getElementById('trial-expired-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function applyProGates(isProOrTrial) {
   document.getElementById('weekly-lock')?.classList.add('hidden');
   document.getElementById('weekly-content')?.classList.remove('hidden');
   document.getElementById('goals-lock')?.classList.add('hidden');
   document.getElementById('goals-content')?.classList.remove('hidden');
 
-  // Show trial notes only for free users
+  // Show trial notes only for free users (post-trial)
   const weeklyNote = document.getElementById('weekly-trial-note');
-  if (weeklyNote) weeklyNote.classList.toggle('hidden', isPro);
+  if (weeklyNote) weeklyNote.classList.toggle('hidden', isProOrTrial);
   updateGoalsTrialNote();
 
-  // Export button: locked for free users
+  // Export button: unlocked for pro and trial, locked for free
   const exportBtn = document.getElementById('dropdown-export-btn');
   if (exportBtn) {
-    if (isPro) {
+    if (isProOrTrial) {
       exportBtn.classList.remove('dropdown-btn-locked');
       exportBtn.removeAttribute('title');
     } else {
@@ -335,7 +414,7 @@ function applyProGates(isPro) {
 }
 
 async function exportJournal() {
-  if (!state.user || state.userPlan !== 'pro') {
+  if (!state.user || state.accessLevel === 'free') {
     showToast('Upgrade to Pro to export your journal');
     showPaymentWall();
     return;
@@ -485,6 +564,26 @@ function showPaymentWall() {
   document.getElementById('payment-wall')?.classList.remove('hidden');
 }
 function hidePaymentWall() { document.getElementById('payment-wall')?.classList.add('hidden'); }
+
+// Warm, non-aggressive upgrade prompt toast — shown at most once per session per feature
+function showUpgradePrompt(message, featureKey) {
+  if (featureKey && state.upgradeShown.has(featureKey)) return;
+  if (featureKey) state.upgradeShown.add(featureKey);
+  const existing = document.getElementById('upgrade-prompt-toast');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.id = 'upgrade-prompt-toast';
+  el.className = 'upgrade-prompt-toast';
+  el.innerHTML = `
+    <p class="upgrade-prompt-msg">${escapeHTML(message)}</p>
+    <div class="upgrade-prompt-actions">
+      <button class="btn btn-primary btn-sm upgrade-prompt-btn" onclick="document.getElementById('upgrade-prompt-toast')?.remove();showPaymentWall()">Upgrade to Pro — ₦3,000/month</button>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('upgrade-prompt-toast')?.remove()">Not now</button>
+    </div>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('visible'));
+  setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 300); }, 8000);
+}
 
 async function loadConfig() {
   try {
@@ -860,31 +959,14 @@ async function loadEntries() {
   } catch (err) { console.error('[loadEntries]', err.message); }
 }
 
-const FREE_ENTRY_LIMIT = 3;
-
 function updateFreeEntryCounter() {
+  // Entries are now unlimited for all users — hide the counter
   const counter = document.getElementById('free-entry-counter');
-  if (!counter) return;
-  if (!state.user || state.user.paid) { counter.classList.add('hidden'); return; }
-  const hasToday  = state.entries.some(e => e.date === getTodayISO());
-  const remaining = Math.max(0, FREE_ENTRY_LIMIT - state.entries.length);
-  if (hasToday || state.entries.length >= FREE_ENTRY_LIMIT) {
-    counter.classList.add('hidden');
-    return;
-  }
-  counter.classList.remove('hidden');
-  counter.textContent = remaining === 1
-    ? '1 free entry remaining — subscribe for unlimited'
-    : `${remaining} of ${FREE_ENTRY_LIMIT} free entries remaining`;
+  if (counter) counter.classList.add('hidden');
 }
 
 async function saveEntry(text, mood) {
   const todayISO = getTodayISO();
-  const hasToday = state.entries.some(e => e.date === todayISO);
-  if (!hasToday && !state.user?.paid && state.entries.length >= FREE_ENTRY_LIMIT) {
-    showPaymentWall();
-    return;
-  }
   const data = await api('POST', '/api/entries', { date: todayISO, text, mood: mood || null });
   if (!data) return;
   const idx = state.entries.findIndex(e => e.date === data.entry.date);
@@ -1282,8 +1364,8 @@ function openCoachThread(index) {
       ]
     };
     appendCoachBubble(document.getElementById(`coach-messages-${index}`), 'coach', promptText);
-    // Initialise progress at exchange 1 (the reflection prompt just shown)
-    const total = state.userPlan === 'pro' ? 10 : 6;
+    // pro/trial: 10 total; free: 3 total
+    const total = (state.accessLevel === 'pro' || state.accessLevel === 'trial') ? 10 : 3;
     updateCoachProgress(index, 1, total);
   }
 
@@ -1313,10 +1395,10 @@ async function sendCoachMessage(index) {
   const thinking = appendCoachThinking(msgEl);
   thinking.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-  // Exchange limits: free = 5 coach exchanges (6 total incl. initial reflect), pro = 9 (10 total)
-  const isPro         = state.userPlan === 'pro';
-  const coachLimit    = isPro ? 9 : 5;
-  const totalExchanges = isPro ? 10 : 6;
+  // Exchange limits: pro/trial = 10 total (9 coach), free = 3 total (2 coach)
+  const isPro         = state.accessLevel === 'pro' || state.accessLevel === 'trial';
+  const coachLimit    = isPro ? 9 : 2;
+  const totalExchanges = isPro ? 10 : 3;
 
   let sessionEnded = false;
   try {
@@ -1377,7 +1459,7 @@ function updateCoachProgress(index, current, total) {
 }
 
 function showSessionComplete(finalMessage) {
-  const isPro     = state.userPlan === 'pro';
+  const isPro     = state.accessLevel === 'pro' || state.accessLevel === 'trial';
   const today     = getTodayISO();
   const entry     = state.entries.find(e => e.date === today);
   const moodInfo  = moodById(entry?.mood || state.selectedMood);
@@ -1410,7 +1492,7 @@ function showSessionComplete(finalMessage) {
         <button class="btn btn-secondary" onclick="startNewEntry()">Start New Entry</button>
       </div>
       ${!isPro ? `<div class="session-upgrade-prompt">
-        Want to go deeper? <button class="session-upgrade-link" onclick="showUpgradeModal()">Upgrade to Pro</button> for extended coaching sessions
+        Want to go deeper? <button class="session-upgrade-link" onclick="showUpgradeModal()">Upgrade to Pro</button> for 10 coaching exchanges — ₦3,000/month
       </div>` : `<div class="session-upgrade-prompt">
         Enjoyed today's session? <a href="/referral.html" class="session-upgrade-link">Share ReflectAI with a friend</a> and earn a free month
       </div>`}
@@ -1624,6 +1706,21 @@ async function generateWeeklyInsight() {
   try {
     const data = await api('POST', '/api/weekly-insight');
     if (!data) return;
+
+    // Monthly limit reached for free users
+    if (data._insightMonthlyLimit) {
+      const nextDate = data.nextAvailableDate
+        ? new Date(data.nextAvailableDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+        : 'next month';
+      error.textContent = data.error || `Your next insight is available on ${nextDate}.`;
+      error.classList.remove('hidden');
+      if (!state.upgradeShown.has('insights')) {
+        state.upgradeShown.add('insights');
+        showUpgradePrompt(`Upgrade to Pro for weekly insights — your next free insight is on ${nextDate}.`, 'insights');
+      }
+      return;
+    }
+
     textEl.textContent = data.insight;
     textEl.classList.remove('placeholder-text');
     const count = Math.min(state.entries.length, 7);
@@ -1715,11 +1812,12 @@ async function goalCheckin(id) {
 function updateGoalsTrialNote() {
   const note = document.getElementById('goals-trial-note');
   if (!note) return;
-  if (!state.user || state.user.plan === 'pro') { note.classList.add('hidden'); return; }
+  if (!state.user || state.accessLevel !== 'free') { note.classList.add('hidden'); return; }
   note.classList.remove('hidden');
-  note.textContent = state.goals.length >= 1
-    ? '1 free goal included · Subscribe for unlimited goals & AI check-ins'
-    : 'Free trial: add 1 goal to try it out · Subscribe for unlimited';
+  const activeGoals = state.goals.filter(g => g.status !== 'completed').length;
+  note.textContent = activeGoals >= 2
+    ? 'Free plan: 2 active goals maximum · Upgrade to Pro for unlimited goals'
+    : `Free plan: ${2 - activeGoals} goal slot${activeGoals === 1 ? '' : 's'} remaining · Upgrade for unlimited`;
 }
 
 function renderGoals() {
@@ -2192,7 +2290,9 @@ async function loadMoodLogs() {
   try {
     const data = await api('GET', '/api/mood-logs');
     if (!data) return;
-    _moodLogs = data.logs || [];
+    _moodLogs                = data.logs || [];
+    state.moodRestricted     = data.moodRestricted  || false;
+    state.moodHasOlderData   = data.hasOlderData    || false;
     renderHomeMoodCheckIn();
   } catch (e) { console.error('[loadMoodLogs]', e.message); }
 }
@@ -2291,9 +2391,15 @@ function initInsightsTab() {
   _insightsLoaded = true;
   renderInsightsMoodChart();
   loadWeeklySummary();
-  const isPro = state.userPlan === 'pro';
-  document.getElementById('export-pro-section')?.classList.toggle('hidden', !isPro);
-  document.getElementById('export-free-section')?.classList.toggle('hidden', isPro);
+  const isProOrTrial = state.accessLevel === 'pro' || state.accessLevel === 'trial';
+  document.getElementById('export-pro-section')?.classList.toggle('hidden', !isProOrTrial);
+  document.getElementById('export-free-section')?.classList.toggle('hidden', isProOrTrial);
+
+  // Update mood chart title and restriction overlay
+  const titleEl = document.getElementById('mood-chart-title');
+  if (titleEl) titleEl.textContent = state.moodRestricted ? 'Mood — Last 7 Days' : 'Mood This Week';
+  const upgradeEl = document.getElementById('mood-history-upgrade');
+  if (upgradeEl) upgradeEl.classList.toggle('hidden', !state.moodHasOlderData);
 }
 
 function renderInsightsMoodChart() {

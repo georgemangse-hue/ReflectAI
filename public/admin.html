@@ -175,16 +175,24 @@
             <div class="stat-val c-green" id="s-active">—</div>
           </div>
           <div class="stat-card">
+            <div class="stat-label">On Trial</div>
+            <div class="stat-val c-yellow" id="s-trial">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Avg Trial Days Left</div>
+            <div class="stat-val c-yellow" id="s-trial-days">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Post-Trial Free</div>
+            <div class="stat-val c-red" id="s-post-trial">—</div>
+          </div>
+          <div class="stat-card">
             <div class="stat-label">Cancelling</div>
             <div class="stat-val c-yellow" id="s-cancel">—</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Expired</div>
-            <div class="stat-val c-red" id="s-expired">—</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Free (unpaid)</div>
-            <div class="stat-val c-muted" id="s-free">—</div>
+            <div class="stat-label">Conversion Rate</div>
+            <div class="stat-val c-green" id="s-conversion">—</div>
           </div>
         </div>
 
@@ -198,9 +206,10 @@
             <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
               <select class="filter-select" id="filter-select" onchange="filter()">
                 <option value="all">All users</option>
-                <option value="free">Free</option>
-                <option value="pro">Pro</option>
-                <option value="week">This week</option>
+                <option value="trial">On Trial</option>
+                <option value="post-trial">Post-Trial Free</option>
+                <option value="pro">Pro (paying)</option>
+                <option value="week">Joined this week</option>
               </select>
               <input class="search-input" id="search" placeholder="Search name or email…" oninput="filter()" />
             </div>
@@ -398,11 +407,22 @@
 
     /* ── Render ────────────────────────────────────── */
     function renderStats(s) {
-      $('s-total').textContent   = s.total;
-      $('s-active').textContent  = s.active;
-      $('s-cancel').textContent  = s.nonRenewing;
-      $('s-expired').textContent = s.expired;
-      $('s-free').textContent    = s.free;
+      $('s-total').textContent      = s.total;
+      $('s-active').textContent     = s.active;
+      $('s-trial').textContent      = s.onTrial      ?? '—';
+      $('s-trial-days').textContent = s.trialDaysAvg != null ? s.trialDaysAvg + 'd' : '—';
+      $('s-post-trial').textContent = s.postTrialFree ?? '—';
+      $('s-cancel').textContent     = s.nonRenewing;
+      $('s-conversion').textContent = s.conversionRate != null ? s.conversionRate + '%' : '—';
+    }
+
+    function trialBadge(u) {
+      if (u.access_level === 'trial') {
+        const d = u.trialDaysLeft || 0;
+        return `<span class="badge b-cancel">⏳ Trial · ${d}d left</span>`;
+      }
+      if (u.access_level === 'free') return `<span class="badge b-expired">✕ Post-trial</span>`;
+      return '';
     }
 
     function updateSelectionUI() {
@@ -453,11 +473,12 @@
               const checked = selectedIds.has(u.id) ? 'checked' : '';
               const selPro  = u.paid ? 'selected' : '';
               const selFree = !u.paid ? 'selected' : '';
+              const accessInfo = u.paid ? '' : trialBadge(u);
               return `<tr>
                 <td class="cb-cell"><input type="checkbox" data-id="${esc(u.id)}" ${checked} onchange="toggleRow('${esc(u.id)}', this.checked)" /></td>
                 <td style="white-space:nowrap">${name}</td>
                 <td class="td-email">${esc(u.email)}</td>
-                <td id="status-${esc(u.id)}">${statusBadge(u)}</td>
+                <td id="status-${esc(u.id)}">${statusBadge(u)}${accessInfo ? ' ' + accessInfo : ''}</td>
                 <td style="white-space:nowrap">
                   <select class="plan-select" data-uid="${esc(u.id)}" onchange="changePlan(this)">
                     <option value="free" ${selFree}>Free</option>
@@ -511,9 +532,10 @@
       const seg  = $('filter-select')?.value || 'all';
       const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
       let list = allUsers;
-      if (seg === 'free')  list = list.filter(u => !u.paid);
-      if (seg === 'pro')   list = list.filter(u => u.paid);
-      if (seg === 'week')  list = list.filter(u => u.createdAt >= weekAgo);
+      if (seg === 'trial')      list = list.filter(u => u.access_level === 'trial');
+      if (seg === 'post-trial') list = list.filter(u => u.access_level === 'free' && !u.paid);
+      if (seg === 'pro')        list = list.filter(u => u.paid);
+      if (seg === 'week')       list = list.filter(u => u.createdAt >= weekAgo);
       if (q) list = list.filter(u => {
         const name = [u.firstName, u.lastName].filter(Boolean).join(' ').toLowerCase();
         return u.email.toLowerCase().includes(q) || name.includes(q);
