@@ -2529,8 +2529,10 @@ async function loadWeeklySummary() {
 async function handleInsightsExport() {
   const btn     = document.getElementById('insights-export-btn');
   const spinner = document.getElementById('insights-export-spinner');
+  const label   = document.getElementById('insights-export-label');
   if (btn) btn.disabled = true;
   if (spinner) spinner.classList.remove('hidden');
+  if (label) label.textContent = 'Generating PDF...';
   try {
     const token = localStorage.getItem('reflectai_token');
     const res   = await fetch('/api/export/pdf', {
@@ -2538,7 +2540,7 @@ async function handleInsightsExport() {
     });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
-      showToast(d.error || 'Export failed.');
+      showToast(d.error || 'Export failed. Please try again.');
       return;
     }
     const blob = await res.blob();
@@ -2549,11 +2551,12 @@ async function handleInsightsExport() {
     a.href = url; a.download = 'ReflectAI-Journal-' + username + '-' + dateStr + '.pdf';
     document.body.appendChild(a); a.click();
     document.body.removeChild(a); URL.revokeObjectURL(url);
-    showToast('Journal exported!');
+    showToast('Your journal has been exported 🌿');
   } catch { showToast('Export failed. Please try again.'); }
   finally {
     if (btn) btn.disabled = false;
     if (spinner) spinner.classList.add('hidden');
+    if (label) label.textContent = 'Export as PDF';
   }
 }
 
