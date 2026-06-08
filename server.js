@@ -2179,27 +2179,28 @@ Your check-in should note any specific evidence from the journal entries that re
       const today        = now.toISOString().split('T')[0];
       const weekKey      = weekStartISO;
 
-      const allCached = readJSON(weeklyInsightFile(user.id), {});
-      if (allCached[weekKey]) {
-        return sendJSON(res, 200, { ...allCached[weekKey], cached: true });
-      }
-
-      // Compute stats from entries + mood logs
-      const entries    = readJSON(entriesFile(user.id));
+      // Always compute fresh stats (cheap: just reads local JSON files)
+      const entries     = readJSON(entriesFile(user.id));
       const weekEntries = entries.filter(e => e.date >= weekStartISO && e.date <= today);
       const totalWords  = weekEntries.reduce((s, e) => s + (e.text ? e.text.trim().split(/\s+/).length : 0), 0);
 
-      const logs      = readJSON(moodLogsFile(user.id));
-      const weekLogs  = logs.filter(l => l.date >= weekStartISO && l.date <= today);
+      const logs     = readJSON(moodLogsFile(user.id));
+      const weekLogs = logs.filter(l => l.date >= weekStartISO && l.date <= today);
       const moodCounts = {};
       weekLogs.forEach(l => { moodCounts[l.mood] = (moodCounts[l.mood] || 0) + 1; });
       const topMood = Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+      const avgMoodScore = weekLogs.length > 0
+        ? Math.round(weekLogs.reduce((s, l) => s + l.score, 0) / weekLogs.length * 10) / 10
+        : null;
+      const moodCount = weekLogs.length;
 
-      const stats = { entries: weekEntries.length, words: totalWords, topMood };
+      const stats = { entries: weekEntries.length, words: totalWords, topMood, avgMoodScore, moodCount };
 
-      // Generate one-line AI insight (only if entries exist and API key is set)
-      let aiInsight = null;
-      if (API_KEY && weekEntries.length > 0) {
+      // Only cache the AI insight (expensive Claude API call)
+      const allCached = readJSON(weeklyInsightFile(user.id), {});
+      let aiInsight = allCached[weekKey]?.aiInsight || null;
+
+      if (!aiInsight && API_KEY && weekEntries.length > 0) {
         try {
           const sample = weekEntries.slice(0, 5)
             .map((e, i) => `Entry ${i + 1} (${e.date}):\n${e.text.slice(0, 250)}`)
@@ -2209,13 +2210,12 @@ Your check-in should note any specific evidence from the journal entries that re
             'You are a warm life coach. Respond with exactly one encouraging sentence, max 30 words. No preamble, no quotes.'
           );
           aiInsight = result.content[0].text.trim();
+          allCached[weekKey] = { aiInsight, generatedAt: Date.now() };
+          writeJSON(weeklyInsightFile(user.id), allCached);
         } catch { aiInsight = null; }
       }
 
-      const summary = { weekKey, stats, aiInsight, generatedAt: Date.now() };
-      allCached[weekKey] = summary;
-      writeJSON(weeklyInsightFile(user.id), allCached);
-      return sendJSON(res, 200, { ...summary, cached: false });
+      return sendJSON(res, 200, { weekKey, stats, aiInsight, cached: !!allCached[weekKey] });
     }
 
     /* ==============================================================

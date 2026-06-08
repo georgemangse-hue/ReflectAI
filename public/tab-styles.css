@@ -419,6 +419,9 @@
 .insights-chart-wrap {
   height: 180px;
   position: relative;
+  background: #E1F5EE;
+  border-radius: 8px;
+  padding: 4px;
 }
 .insights-chart-wrap canvas {
   width: 100% !important;

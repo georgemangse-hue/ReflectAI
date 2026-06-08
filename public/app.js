@@ -2407,23 +2407,32 @@ function renderInsightsMoodChart() {
   const emptyEl = document.getElementById('insights-mood-empty');
   if (!wrap) return;
 
-  const today = new Date();
-  const labels = [], scores = [];
+  // Use UTC dates to match how the backend saves mood logs
+  const todayISO = new Date().toISOString().split('T')[0];
+  const labels = [], scores = [], isos = [];
+
   for (let i = 6; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - i);
     const iso = d.toISOString().split('T')[0];
-    const log = _moodLogs.find(l => l.date === iso);
+    isos.push(iso);
     labels.push(d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' }));
+    const log = _moodLogs.find(l => l.date === iso);
     scores.push(log ? log.score : null);
   }
 
-  const hasData = scores.some(s => s !== null);
-  if (!hasData) {
+  const todayIdx   = isos.indexOf(todayISO);
+  const validCount = scores.filter(s => s !== null).length;
+
+  if (validCount < 2) {
     wrap.classList.add('hidden');
     emptyEl?.classList.remove('hidden');
+    console.log('[MoodChart] Not enough data to render — validCount:', validCount, '| _moodLogs:', _moodLogs);
     return;
   }
+
+  console.log('[MoodChart] Rendering — isos:', isos, '| scores:', scores, '| todayIdx:', todayIdx);
+
   wrap.classList.remove('hidden');
   emptyEl?.classList.add('hidden');
 
@@ -2432,66 +2441,83 @@ function renderInsightsMoodChart() {
 
   if (_insightsMoodChart) { _insightsMoodChart.destroy(); _insightsMoodChart = null; }
 
-  const cs          = getComputedStyle(document.documentElement);
-  const borderClr   = cs.getPropertyValue('--border').trim()      || '#cde5d8';
-  const textMuted   = cs.getPropertyValue('--text-muted').trim()  || '#587568';
+  const textMuted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#587568';
+
+  // Today's point: larger filled green dot; other days: small white dot; null: invisible
+  const pointRadius    = scores.map((s, i) => s === null ? 0 : (i === todayIdx ? 7 : 4));
+  const pointBgColor   = scores.map((s, i) => s === null ? 'transparent' : (i === todayIdx ? '#1D9E75' : '#fff'));
+  const pointBorderClr = scores.map(s => s === null ? 'transparent' : '#1D9E75');
 
   _insightsMoodChart = new Chart(canvas, {
-    type: 'bar',
+    type: 'line',
     data: {
       labels,
       datasets: [{
         label: 'Mood',
         data: scores,
-        backgroundColor: scores.map(s =>
-          s === null ? 'transparent' : `rgba(29,158,117,${0.2 + (s / 5) * 0.65})`),
-        borderColor: scores.map(s => s === null ? 'transparent' : '#1D9E75'),
-        borderWidth: 2,
-        borderRadius: 6,
+        borderColor: '#1D9E75',
+        borderWidth: 2.5,
+        tension: 0.4,
+        spanGaps: false,
+        pointRadius,
+        pointHoverRadius: 7,
+        pointBackgroundColor: pointBgColor,
+        pointBorderColor: pointBorderClr,
+        pointBorderWidth: 2,
+        fill: true,
+        backgroundColor: 'rgba(29, 158, 117, 0.08)',
       }]
     },
     options: {
-      responsive: true, maintainAspectRatio: false,
+      responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
             label(ctx) {
-              return ['','😞 Awful','😐 Meh','🙂 Okay','😊 Good','🤩 Great'][ctx.raw] || '—';
+              if (ctx.raw === null) return '—';
+              return ['', '😞 Awful', '😐 Meh', '🙂 Okay', '😊 Good', '🤩 Great'][ctx.raw] || '—';
             }
           }
         }
       },
       scales: {
         y: {
-          min: 0, max: 5,
+          min: 1,
+          max: 5,
           ticks: {
-            stepSize: 1, color: textMuted, font: { size: 11 },
-            callback: v => ['','😞','😐','🙂','😊','🤩'][v] || ''
+            stepSize: 1,
+            color: textMuted,
+            font: { size: 11 },
+            callback: v => ['', '😞', '😐', '🙂', '😊', '🤩'][v] || ''
           },
-          grid: { color: borderClr }
+          grid: { color: 'rgba(29, 158, 117, 0.15)' }
         },
-        x: { ticks: { color: textMuted, font: { size: 11 } }, grid: { display: false } }
+        x: {
+          ticks: { color: textMuted, font: { size: 11 } },
+          grid: { display: false }
+        }
       }
     }
   });
 }
 
 async function loadWeeklySummary() {
-  const loaderEl   = document.getElementById('insight-loader');
-  const entriesEl  = document.getElementById('weekly-stat-entries');
-  const wordsEl    = document.getElementById('weekly-stat-words');
-  const moodEl     = document.getElementById('weekly-stat-mood');
-  const textEl     = document.getElementById('insight-text');
+  const loaderEl    = document.getElementById('insight-loader');
+  const topMoodEl   = document.getElementById('weekly-stat-top-mood');
+  const avgScoreEl  = document.getElementById('weekly-stat-avg-score');
+  const moodDaysEl  = document.getElementById('weekly-stat-mood-days');
+  const textEl      = document.getElementById('insight-text');
   if (!loaderEl) return;
   loaderEl.classList.remove('hidden');
   try {
     const data = await api('GET', '/api/insights/weekly-summary');
     if (!data) return;
-    if (entriesEl) entriesEl.textContent = data.stats?.entries ?? '—';
-    if (wordsEl)   wordsEl.textContent   = data.stats?.words   ?? '—';
     const EM = { awful: '😞', meh: '😐', okay: '🙂', good: '😊', great: '🤩' };
-    if (moodEl)  moodEl.textContent  = data.stats?.topMood ? (EM[data.stats.topMood] || data.stats.topMood) : '—';
+    if (topMoodEl)  topMoodEl.textContent  = data.stats?.topMood ? (EM[data.stats.topMood] || data.stats.topMood) : '—';
+    if (avgScoreEl) avgScoreEl.textContent = data.stats?.avgMoodScore != null ? data.stats.avgMoodScore + '/5' : '—';
+    if (moodDaysEl) moodDaysEl.textContent = data.stats?.moodCount ?? '—';
     if (textEl) {
       textEl.textContent = data.aiInsight || 'Write more entries this week to get your AI insight.';
       textEl.classList.toggle('placeholder-text', !data.aiInsight);
