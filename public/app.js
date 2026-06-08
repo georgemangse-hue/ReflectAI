@@ -2424,10 +2424,10 @@ function renderInsightsMoodChart() {
   const todayIdx   = isos.indexOf(todayISO);
   const validCount = scores.filter(s => s !== null).length;
 
-  if (validCount < 2) {
+  if (validCount < 1) {
     wrap.classList.add('hidden');
     emptyEl?.classList.remove('hidden');
-    console.log('[MoodChart] Not enough data to render — validCount:', validCount, '| _moodLogs:', _moodLogs);
+    console.log('[MoodChart] No data to render — validCount:', validCount, '| _moodLogs:', _moodLogs);
     return;
   }
 
