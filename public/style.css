@@ -2429,29 +2429,30 @@ footer {
   text-align: center;
 }
 
-.payment-features {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 1.5rem;
-  text-align: left;
+.cmp-feat-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.payment-features li {
+.payment-privacy-note {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 0;
-  font-size: 0.9rem;
-  color: var(--text);
-  border-bottom: 1px solid var(--border-light);
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #999;
+  text-align: center;
+  margin: 0 0 6px;
   line-height: 1.4;
 }
 
-.payment-features li:last-child { border-bottom: none; }
-
-.feat-icon {
-  flex-shrink: 0;
-  display: block;
+.payment-mental-health-note {
+  font-size: 11px;
+  color: #999;
+  text-align: center;
+  margin: 0 0 1rem;
+  line-height: 1.4;
 }
 
 .payment-options {
