@@ -538,7 +538,7 @@ function applyPaymentWallRegion() {
   const region = getEffectiveRegion();
 
   if (region === 'NG') {
-    if (priceEl)   priceEl.innerHTML   = '🇳🇬 ₦3,000' + note;
+    if (priceEl)   priceEl.innerHTML   = '₦3,000' + note;
     if (switchRow) switchRow.innerHTML = 'Not in Nigeria? <a href="#" class="payment-switch-link" onclick="switchPaymentCurrency(\'INTL\');return false;">Switch to USD ($7.99/month)</a>';
     paystackOpt.classList.remove('hidden');
     flutterwaveOpt.classList.add('hidden');
