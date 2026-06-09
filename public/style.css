@@ -3706,3 +3706,150 @@ footer {
   background: rgba(245,200,66,0.12);
   color: #f5c842;
 }
+
+
+/* ================================================================
+   35. PAYMENT WALL — PLAN BADGE
+================================================================ */
+.payment-wall-plan-badge {
+  display: block;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 14px;
+  border-radius: 20px;
+  margin-bottom: 0.75rem;
+  letter-spacing: 0.01em;
+}
+.badge-free  { background: #ebebeb; color: #666; }
+.badge-trial { background: #fff7e0; color: #b45309; border: 1px solid #f5c842; }
+.badge-pro   { background: #e8f5ef; color: #1D9E75; border: 1px solid #b2dfc8; }
+
+
+/* ================================================================
+   36. FREE vs PRO COMPARISON TABLE
+================================================================ */
+.plan-compare-wrap {
+  margin: 0.5rem 0 1.25rem;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 0.8rem;
+}
+.plan-compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.plan-compare-table thead th {
+  padding: 8px 10px;
+  font-weight: 600;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border-light);
+  white-space: nowrap;
+}
+.plan-compare-table .cmp-feature { text-align: left; width: 50%; }
+.plan-compare-table .cmp-free    { text-align: center; width: 25%; color: #888; }
+.plan-compare-table .cmp-pro     { text-align: center; width: 25%; color: #1D9E75; }
+.plan-compare-table tbody td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text);
+  line-height: 1.35;
+}
+.plan-compare-table tbody tr:last-child td { border-bottom: none; }
+.plan-compare-table .cmp-free-val  { text-align: center; color: #888; font-weight: 500; }
+.plan-compare-table .cmp-pro-val   { text-align: center; color: #1D9E75; font-weight: 600; }
+.plan-compare-table .cmp-cross     { color: #E05555 !important; }
+/* Dark mode */
+[data-theme="dark"] .plan-compare-wrap     { border-color: rgba(255,255,255,0.1); }
+[data-theme="dark"] .plan-compare-table thead th { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.08); }
+[data-theme="dark"] .plan-compare-table tbody td { border-color: rgba(255,255,255,0.06); color: #d0e8da; }
+[data-theme="dark"] .cmp-free-val          { color: #8aad9a !important; }
+
+
+/* ================================================================
+   37. PRO LOCK ICON + TOOLTIP
+================================================================ */
+.pro-lock-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.lock-icon {
+  color: #999;
+  flex-shrink: 0;
+  display: block;
+  margin-left: 4px;
+}
+.lock-tooltip {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1b3028;
+  color: #fff;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  padding: 5px 10px;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 200;
+  font-weight: 500;
+}
+.lock-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #1b3028;
+}
+.pro-lock-tip:hover .lock-tooltip,
+.pro-lock-tip:focus .lock-tooltip {
+  opacity: 1;
+}
+/* On touch devices, tap to show */
+.pro-lock-tip.tip-visible .lock-tooltip { opacity: 1; }
+
+/* Export section with lock icon inline */
+.export-free-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0.5rem;
+}
+
+/* Insight footer layout */
+.insight-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Goals note lock */
+.goals-lock-tip {
+  vertical-align: -1px;
+  margin-right: 2px;
+}
+.inline-upgrade-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--primary);
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.inline-upgrade-link:hover { color: var(--primary-dark); }
+
+/* Touch: show tooltip on focus/tap */
+@media (hover: none) {
+  .pro-lock-tip:active .lock-tooltip { opacity: 1; }
+}

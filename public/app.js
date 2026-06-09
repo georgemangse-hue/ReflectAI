@@ -561,7 +561,28 @@ function switchPaymentCurrency(region) {
 
 function showPaymentWall() {
   applyPaymentWallRegion();
+  updatePaymentWallBadge();
   document.getElementById('payment-wall')?.classList.remove('hidden');
+}
+
+function updatePaymentWallBadge() {
+  const badge = document.getElementById('payment-wall-plan-badge');
+  if (!badge) return;
+  badge.className = 'payment-wall-plan-badge';
+  const level = state.accessLevel;
+  if (level === 'pro') {
+    badge.textContent = 'Current plan: Pro ✓';
+    badge.classList.add('badge-pro');
+  } else if (level === 'trial') {
+    const daysLeft = state.user?.trial_end_date
+      ? Math.max(0, Math.ceil((state.user.trial_end_date - Date.now()) / 86400000))
+      : 0;
+    badge.textContent = `Current plan: Pro Trial — ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`;
+    badge.classList.add('badge-trial');
+  } else {
+    badge.textContent = 'Current plan: Free';
+    badge.classList.add('badge-free');
+  }
 }
 function hidePaymentWall() { document.getElementById('payment-wall')?.classList.add('hidden'); }
 
@@ -878,6 +899,16 @@ function closeAccountDropdown() {
 document.addEventListener('click', function(e) {
   const wrap = document.getElementById('account-dropdown-wrap');
   if (wrap && !wrap.contains(e.target)) closeAccountDropdown();
+
+  // Toggle lock tooltips on tap (mobile)
+  const tip = e.target.closest('.pro-lock-tip');
+  if (tip) {
+    document.querySelectorAll('.pro-lock-tip.tip-visible').forEach(t => { if (t !== tip) t.classList.remove('tip-visible'); });
+    tip.classList.toggle('tip-visible');
+    e.stopPropagation();
+  } else {
+    document.querySelectorAll('.pro-lock-tip.tip-visible').forEach(t => t.classList.remove('tip-visible'));
+  }
 });
 
 
@@ -1714,6 +1745,7 @@ async function generateWeeklyInsight() {
         : 'next month';
       error.textContent = data.error || `Your next insight is available on ${nextDate}.`;
       error.classList.remove('hidden');
+      document.getElementById('insight-lock-tip')?.classList.remove('hidden');
       if (!state.upgradeShown.has('insights')) {
         state.upgradeShown.add('insights');
         showUpgradePrompt(`Upgrade to Pro for weekly insights — your next free insight is on ${nextDate}.`, 'insights');
@@ -1809,15 +1841,19 @@ async function goalCheckin(id) {
   finally { btn.disabled = false; btn.textContent = '🤖 Check in'; }
 }
 
+const LOCK_ICON_SVG = `<svg class="lock-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+
 function updateGoalsTrialNote() {
   const note = document.getElementById('goals-trial-note');
   if (!note) return;
   if (!state.user || state.accessLevel !== 'free') { note.classList.add('hidden'); return; }
   note.classList.remove('hidden');
   const activeGoals = state.goals.filter(g => g.status !== 'completed').length;
-  note.textContent = activeGoals >= 2
-    ? 'Free plan: 2 active goals maximum · Upgrade to Pro for unlimited goals'
-    : `Free plan: ${2 - activeGoals} goal slot${activeGoals === 1 ? '' : 's'} remaining · Upgrade for unlimited`;
+  if (activeGoals >= 2) {
+    note.innerHTML = `<span class="pro-lock-tip goals-lock-tip" tabindex="0" role="button" onclick="showPaymentWall()">${LOCK_ICON_SVG}<span class="lock-tooltip">Pro feature — upgrade to unlock</span></span> Free plan: 2 active goals maximum · <button class="inline-upgrade-link" onclick="showPaymentWall()">Upgrade to Pro</button> for unlimited goals`;
+  } else {
+    note.textContent = `Free plan: ${2 - activeGoals} goal slot${activeGoals === 1 ? '' : 's'} remaining · Upgrade for unlimited`;
+  }
 }
 
 function renderGoals() {

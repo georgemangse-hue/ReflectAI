@@ -108,11 +108,35 @@
   <div id="payment-wall" class="auth-overlay hidden" aria-modal="true" role="dialog" aria-label="Unlock ReflectAI">
     <div class="auth-card payment-card">
       <button class="payment-wall-close" onclick="closePaymentWall()" aria-label="Close">✕</button>
+      <div id="payment-wall-plan-badge" class="payment-wall-plan-badge badge-free">Current plan: Free</div>
       <div class="auth-logo">🌿 <strong>Reflect</strong>AI</div>
       <h2 class="payment-title">Subscribe to ReflectAI</h2>
       <p class="payment-trial-offer">🌿 Start with 30 days free — no credit card required</p>
       <p class="payment-price" id="payment-price-display">₦3,000<span class="payment-price-note">/month · cancel anytime</span></p>
       <p class="payment-switch-row" id="payment-switch-currency"></p>
+
+      <!-- Free vs Pro comparison table -->
+      <div class="plan-compare-wrap">
+        <table class="plan-compare-table" aria-label="Free vs Pro feature comparison">
+          <thead>
+            <tr>
+              <th class="cmp-feature">Feature</th>
+              <th class="cmp-free">Free</th>
+              <th class="cmp-pro">Pro</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Journal entries</td><td class="cmp-free-val">Unlimited</td><td class="cmp-pro-val">Unlimited</td></tr>
+            <tr><td>AI exchanges/session</td><td class="cmp-free-val">3</td><td class="cmp-pro-val">10</td></tr>
+            <tr><td>Goals</td><td class="cmp-free-val">2 active</td><td class="cmp-pro-val">Unlimited</td></tr>
+            <tr><td>Weekly insights</td><td class="cmp-free-val">1/month</td><td class="cmp-pro-val">Every week</td></tr>
+            <tr><td>Mood history</td><td class="cmp-free-val">7 days</td><td class="cmp-pro-val">90 days</td></tr>
+            <tr><td>PDF export</td><td class="cmp-free-val cmp-cross">✗</td><td class="cmp-pro-val">✓</td></tr>
+            <tr><td>AI memory</td><td class="cmp-free-val cmp-cross">✗</td><td class="cmp-pro-val">✓</td></tr>
+            <tr><td>Journal themes</td><td class="cmp-free-val cmp-cross">✗</td><td class="cmp-pro-val">✓</td></tr>
+          </tbody>
+        </table>
+      </div>
 
       <ul class="payment-features">
         <li>
@@ -635,7 +659,13 @@
           </p>
           <div class="insight-footer">
             <span id="insight-meta" class="insight-meta">Based on your last 7 entries</span>
-            <button class="btn btn-secondary btn-sm" id="generate-insight-btn" onclick="generateWeeklyInsight()">Generate Insight</button>
+            <div class="insight-footer-right">
+              <button class="btn btn-secondary btn-sm" id="generate-insight-btn" onclick="generateWeeklyInsight()">Generate Insight</button>
+              <span id="insight-lock-tip" class="pro-lock-tip hidden" tabindex="0" role="button" aria-label="Pro feature" onclick="showPaymentWall()">
+                <svg class="lock-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <span class="lock-tooltip">Pro feature — upgrade to unlock</span>
+              </span>
+            </div>
           </div>
           <p id="weekly-trial-note" class="free-entry-counter hidden" aria-live="polite"></p>
         </div>
@@ -651,7 +681,13 @@
             </button>
           </div>
           <div id="export-free-section" class="hidden">
-            <button class="btn btn-secondary" disabled style="opacity:0.5;cursor:not-allowed">Export as PDF</button>
+            <div class="export-free-row">
+              <button class="btn btn-secondary" disabled style="opacity:0.5;cursor:not-allowed">Export as PDF</button>
+              <span class="pro-lock-tip" tabindex="0" role="button" aria-label="Pro feature" onclick="showPaymentWall()">
+                <svg class="lock-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <span class="lock-tooltip">Pro feature — upgrade to unlock</span>
+              </span>
+            </div>
             <p class="export-locked-msg">Upgrade to Pro to export your journal</p>
           </div>
         </div>
