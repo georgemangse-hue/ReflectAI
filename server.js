@@ -580,9 +580,9 @@ const getPaystackSubscription    = code => paystackRequest('GET', `/subscription
 const disablePaystackSubscription = (code, token) =>
   paystackRequest('POST', '/subscription/disable', { code, token });
 
-function callClaude(messages, systemPrompt) {
+function callClaude(messages, systemPrompt, maxTokens = 1024) {
   return new Promise((resolve, reject) => {
-    const payload = JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1024, system: systemPrompt, messages });
+    const payload = JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: maxTokens, system: systemPrompt, messages });
     const options = {
       hostname: 'api.anthropic.com',
       path: '/v1/messages',
@@ -609,6 +609,11 @@ function callClaude(messages, systemPrompt) {
     req.write(payload);
     req.end();
   });
+}
+
+function escapeEmailText(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function sendEmail(to, subject, html) {
@@ -2603,7 +2608,219 @@ function startReminderJob() {
                      - now.getUTCMilliseconds();
   setTimeout(() => {
     checkAndSendReminders();
-    setInterval(checkAndSendReminders, 60 * 60 * 1000);
+    checkAndSendWeeklyReports();
+    setInterval(() => {
+      checkAndSendReminders();
+      checkAndSendWeeklyReports();
+    }, 60 * 60 * 1000);
   }, msToNextHour);
   console.log(`  ✓  Reminder job ready — first check in ~${Math.round(msToNextHour / 60000)} min(s)\n`);
+}
+
+/* ================================================================
+   WEEKLY REPORT JOB — Sunday 8am WAT (UTC+1)
+================================================================ */
+function getISOWeek(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
+async function generateWeeklyReportContent(entries, moodLogs) {
+  const entrySample = entries.slice(0, 5)
+    .map((e, i) => `Entry ${i + 1} (${e.date}):\n${e.text}`)
+    .join('\n\n---\n\n');
+
+  const moodScores = moodLogs.map(l => l.score);
+  const avgScore   = moodScores.length
+    ? (moodScores.reduce((a, b) => a + b, 0) / moodScores.length).toFixed(1)
+    : null;
+  const moodCounts = {};
+  moodLogs.forEach(l => { moodCounts[l.mood] = (moodCounts[l.mood] || 0) + 1; });
+  const topMood = Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+
+  const moodContext = moodLogs.length
+    ? `Mood data this week: ${moodLogs.length} check-in(s) logged. Average score: ${avgScore}/5. Most frequent mood: ${topMood}.`
+    : 'No mood check-ins were logged this week.';
+
+  const systemPrompt = `You are a warm, culturally-grounded life coach supporting students and young professionals in Nigeria and across Africa. You have read someone's journal entries and mood data from the past 7 days. Respond with ONLY valid JSON — no markdown fences, no explanation, nothing outside the JSON object.
+
+Return exactly this structure:
+{
+  "moodSummary": "2–3 sentences describing their mood patterns this week. Specific, honest, warm. Reference the actual mood data provided.",
+  "themes": ["short phrase 4–8 words", "short phrase 4–8 words", "short phrase 4–8 words"],
+  "challenge": "One specific, actionable growth challenge for the coming week — 2–3 sentences. Grounded in what you saw in their entries. Culturally resonant, not generic."
+}`;
+
+  const result = await callClaude(
+    [{ role: 'user', content: `Here are my journal entries from the past week:\n\n${entrySample}\n\n${moodContext}` }],
+    systemPrompt,
+    1200
+  );
+  const raw     = result.content[0].text.trim();
+  const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+  return JSON.parse(cleaned);
+}
+
+async function checkAndSendWeeklyReports() {
+  const now     = new Date();
+  const watTime = new Date(now.getTime() + 3600000); // WAT = UTC+1
+  if (watTime.getDay()   !== 0) return; // Sunday only
+  if (watTime.getHours() !== 8) return; // 8am WAT only
+
+  const isoWeek   = getISOWeek(watTime);
+  const users     = readJSON(USERS_FILE);
+  const cutoff    = new Date(watTime); cutoff.setDate(cutoff.getDate() - 6);
+  const cutoffISO = cutoff.toISOString().split('T')[0];
+
+  let sent = 0;
+  for (const user of users) {
+    if (user.weeklyReportSentWeek === isoWeek) continue;
+
+    const allEntries = readEntries(user.id);
+    const weekEntries = allEntries.filter(e => e.date >= cutoffISO);
+    if (!weekEntries.length) continue; // no activity this week
+
+    try {
+      const moodLogs = readJSON(moodLogsFile(user.id)).filter(l => l.date >= cutoffISO);
+      const streak   = computeStreak(allEntries);
+      const ai       = API_KEY
+        ? await generateWeeklyReportContent(weekEntries, moodLogs)
+        : { moodSummary: null, themes: [], challenge: null };
+
+      const firstName = (user.firstName || '').trim() || user.email.split('@')[0];
+      await sendWeeklyReportEmail(user.email, firstName, {
+        streak, moodCount: moodLogs.length,
+        moodSummary: ai.moodSummary,
+        themes:      ai.themes,
+        challenge:   ai.challenge,
+        entryCount:  weekEntries.length,
+      });
+
+      updateUser(user.id, { weeklyReportSentWeek: isoWeek });
+      console.log(`[weekly-report] sent to ${user.email} (week ${isoWeek})`);
+      sent++;
+    } catch (err) {
+      console.error(`[weekly-report] failed for ${user.email}:`, err.message);
+    }
+  }
+
+  if (sent > 0) console.log(`[weekly-report] ${sent} report(s) dispatched for week ${isoWeek}`);
+}
+
+function sendWeeklyReportEmail(email, firstName, { streak, moodCount, moodSummary, themes, challenge, entryCount }) {
+  const year      = new Date().getFullYear();
+  const name      = escapeEmailText((firstName || 'there').slice(0, 30));
+  const appLink   = APP_URL;
+
+  const streakHtml = streak > 0
+    ? `<p style="margin:6px 0 20px;"><span style="display:inline-block;background:#e8f6ee;color:#1D9E75;font-size:13px;font-weight:700;padding:5px 14px;border-radius:20px;">🔥 ${streak}-day streak</span></p>`
+    : '<p style="margin:0 0 20px;"></p>';
+
+  const themesHtml = (Array.isArray(themes) ? themes : []).slice(0, 3).map(t =>
+    `<li style="padding:8px 0;font-size:14px;color:#3d5a4a;line-height:1.6;border-bottom:1px solid #e8f0ea;">✦ &nbsp;${escapeEmailText(t)}</li>`
+  ).join('');
+
+  const moodBlock = moodSummary
+    ? `<p style="font-size:14px;color:#3d5a4a;line-height:1.7;margin:0 0 6px;">${escapeEmailText(moodSummary)}</p>
+       ${moodCount > 0 ? `<p style="font-size:12px;color:#9ab8aa;margin:0;">${moodCount} mood log${moodCount === 1 ? '' : 's'} this week</p>` : ''}`
+    : `<p style="font-size:14px;color:#9ab8aa;margin:0;">No mood check-ins logged — try the mood selector when you write your next entry.</p>`;
+
+  const challengeBlock = challenge
+    ? escapeEmailText(challenge)
+    : 'Keep showing up. Consistency is the real practice.';
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+<body style="margin:0;padding:0;background:#f4f7f4;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f4;padding:40px 16px;">
+  <tr><td align="center">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.08);">
+
+      <!-- Header -->
+      <tr>
+        <td style="background:#1D9E75;padding:28px 40px;text-align:center;">
+          <div><span style="font-size:22px;vertical-align:middle;">🌿</span><span style="color:#fff;font-size:22px;font-weight:700;letter-spacing:-0.3px;vertical-align:middle;">&nbsp;ReflectAI</span></div>
+          <p style="color:rgba(255,255,255,0.85);font-size:13px;margin:8px 0 0;letter-spacing:0.02em;">Your Weekly Reflection Report</p>
+        </td>
+      </tr>
+
+      <!-- Greeting -->
+      <tr>
+        <td style="padding:32px 40px 4px;">
+          <p style="font-size:17px;font-weight:600;color:#1b3028;margin:0 0 4px;">Hi ${name},</p>
+          ${streakHtml}
+          <p style="font-size:14px;color:#7a9a8a;margin:0 0 28px;">You wrote <strong>${entryCount} entr${entryCount === 1 ? 'y' : 'ies'}</strong> this week. Here's your reflection.</p>
+        </td>
+      </tr>
+
+      <!-- Mood Section -->
+      <tr>
+        <td style="padding:0 40px 24px;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4faf7;border-radius:8px;">
+            <tr>
+              <td style="padding:18px 20px;">
+                <p style="font-size:11px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:#1D9E75;margin:0 0 10px;">Mood Patterns This Week</p>
+                ${moodBlock}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <!-- Themes Section -->
+      <tr>
+        <td style="padding:0 40px 24px;">
+          <p style="font-size:11px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:#1D9E75;margin:0 0 10px;">3 Themes From Your Entries</p>
+          <ul style="list-style:none;padding:0;margin:0;border-top:1px solid #e8f0ea;">
+            ${themesHtml || '<li style="padding:8px 0;font-size:14px;color:#9ab8aa;">No entry themes identified this week.</li>'}
+          </ul>
+        </td>
+      </tr>
+
+      <!-- Challenge Section -->
+      <tr>
+        <td style="padding:0 40px 28px;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#1b3028;border-radius:8px;">
+            <tr>
+              <td style="padding:20px 22px;">
+                <p style="font-size:11px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:#4ecb8a;margin:0 0 10px;">Your Growth Challenge This Week</p>
+                <p style="font-size:14px;color:#c8e8d4;line-height:1.75;margin:0;">${challengeBlock}</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <!-- CTA -->
+      <tr>
+        <td style="padding:0 40px 32px;text-align:center;">
+          <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+            <tr>
+              <td style="border-radius:8px;background:#1D9E75;">
+                <a href="${appLink}" style="display:block;padding:14px 36px;color:#fff;font-size:15px;font-weight:600;text-decoration:none;letter-spacing:0.01em;">Open ReflectAI →</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <!-- Footer -->
+      <tr>
+        <td style="border-top:1px solid #e8f0ea;padding:20px 40px;text-align:center;">
+          <p style="font-size:12px;color:#9ab8aa;margin:0 0 4px;">Warm regards, The ReflectAI Team</p>
+          <p style="font-size:11px;color:#b8cfc4;margin:0;">© ${year} PremierLEADZ Consulting Ltd &nbsp;·&nbsp; Your entries are private &amp; never shared.</p>
+        </td>
+      </tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+
+  return sendEmail(email, 'Your weekly reflection report 🌿', html);
 }
