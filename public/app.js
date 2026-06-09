@@ -279,6 +279,8 @@ function onAuthSuccess(token, user) {
   hideAuthOverlay();
   applyUserUI(user);
   loadAppData();
+  maybeShowNotifBanner();
+  if (Notification.permission === 'granted') scheduleNotificationCheck();
 }
 
 function clearAuthState() {
@@ -2737,6 +2739,7 @@ function updateProfileUI(user) {
   }
 
   document.getElementById('profile-upgrade-banner')?.classList.toggle('hidden', isPro);
+  loadReminderSettings(user);
 
   const billingEl   = document.getElementById('profile-billing-section');
   const billingText = document.getElementById('profile-billing-text');
@@ -2808,6 +2811,127 @@ async function saveProfileEdit() {
     }
     setTimeout(cancelEditProfile, 1800);
   } catch (e) { showToast('Could not save: ' + e.message); }
+}
+
+/* ================================================================
+   REMINDERS — Profile section
+================================================================ */
+const NOTIF_ASKED_KEY = 'reflectai_notif_asked';
+
+function buildReminderTimeOptions() {
+  const sel = document.getElementById('reminder-time-select');
+  if (!sel || sel.options.length > 0) return;
+  for (let h = 6; h <= 22; h++) {
+    for (const m of [0, 30]) {
+      if (h === 22 && m === 30) break;
+      const label = new Date(2000, 0, 1, h, m)
+        .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      const value = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+      const opt = document.createElement('option');
+      opt.value = value; opt.textContent = label;
+      sel.appendChild(opt);
+    }
+  }
+}
+
+function loadReminderSettings(user) {
+  const toggle = document.getElementById('reminder-enabled-toggle');
+  const timeRow = document.getElementById('reminder-time-row');
+  if (!toggle) return;
+  buildReminderTimeOptions();
+  const enabled = user?.reminder_enabled || false;
+  toggle.checked = enabled;
+  if (timeRow) timeRow.classList.toggle('hidden', !enabled);
+  const sel = document.getElementById('reminder-time-select');
+  if (sel) sel.value = user?.reminder_time || '20:00';
+}
+
+function onReminderToggleChange() {
+  const enabled = document.getElementById('reminder-enabled-toggle')?.checked;
+  document.getElementById('reminder-time-row')?.classList.toggle('hidden', !enabled);
+}
+
+async function saveReminderSettings() {
+  const enabled  = document.getElementById('reminder-enabled-toggle')?.checked || false;
+  const time     = document.getElementById('reminder-time-select')?.value || '20:00';
+  const btn      = document.getElementById('save-reminder-btn');
+  const msgEl    = document.getElementById('reminder-save-msg');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    const data = await api('PATCH', '/api/user/reminder', { reminder_enabled: enabled, reminder_time: time });
+    if (!data) return;
+    state.user = { ...state.user, reminder_enabled: enabled, reminder_time: time };
+    if (msgEl) { msgEl.classList.remove('hidden'); setTimeout(() => msgEl.classList.add('hidden'), 3000); }
+    if (enabled) showToast('Reminder saved! You\'ll get an email at ' + formatReminderTime(time) + ' if you haven\'t journaled.');
+    else         showToast('Reminder turned off.');
+  } catch (e) { showToast('Could not save reminder: ' + e.message); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Save reminder'; } }
+}
+
+function formatReminderTime(val) {
+  const [h, m] = val.split(':').map(Number);
+  return new Date(2000, 0, 1, h, m)
+    .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+/* ================================================================
+   BROWSER PUSH NOTIFICATIONS (Method A)
+================================================================ */
+function maybeShowNotifBanner() {
+  if (localStorage.getItem(NOTIF_ASKED_KEY)) return;
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'default') return;
+  document.getElementById('notif-permission-banner')?.classList.remove('hidden');
+}
+
+async function enablePushNotifications() {
+  localStorage.setItem(NOTIF_ASKED_KEY, '1');
+  document.getElementById('notif-permission-banner')?.classList.add('hidden');
+  if (!('Notification' in window)) { showToast('Your browser doesn\'t support notifications.'); return; }
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      showToast('Daily reminders enabled! You\'ll be notified when you have the app open.');
+      scheduleNotificationCheck();
+    } else {
+      showToast('Notifications not enabled — you can change this in browser settings.');
+    }
+  } catch (e) { console.error('[push]', e); }
+}
+
+function dismissNotifBanner() {
+  localStorage.setItem(NOTIF_ASKED_KEY, '1');
+  document.getElementById('notif-permission-banner')?.classList.add('hidden');
+}
+
+let _notifCheckInterval = null;
+
+function scheduleNotificationCheck() {
+  if (_notifCheckInterval) return;
+  checkAndShowDailyNotification();
+  _notifCheckInterval = setInterval(checkAndShowDailyNotification, 5 * 60 * 1000);
+}
+
+function checkAndShowDailyNotification() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (!state.user?.reminder_enabled) return;
+  const [rH] = (state.user.reminder_time || '20:00').split(':').map(Number);
+  const now  = new Date();
+  if (now.getHours() !== rH) return;
+  const todayISO = getTodayISO();
+  if (state.entries.some(e => e.date === todayISO)) return;
+  const shownKey = `reflectai_notif_shown_${todayISO}`;
+  if (localStorage.getItem(shownKey)) return;
+  localStorage.setItem(shownKey, '1');
+  navigator.serviceWorker?.ready.then(reg => {
+    reg.showNotification('Your daily reflection 🌿', {
+      body:  'Take 5 minutes to journal today. Your streak is waiting.',
+      icon:  '/icons/icon.svg',
+      badge: '/icons/icon.svg',
+      tag:   'daily-reminder',
+      renotify: false,
+    });
+  }).catch(e => console.warn('[push]', e));
 }
 
 function toggleChangePassword() {

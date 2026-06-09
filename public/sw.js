@@ -27,6 +27,33 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
+/* ── Push notifications ───────────────────────────────────────── */
+self.addEventListener('push', event => {
+  const data  = event.data ? event.data.json() : {};
+  const title = data.title || 'Your daily reflection 🌿';
+  const body  = data.body  || 'Take 5 minutes to journal today. Your streak is waiting.';
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon:  '/icons/icon.svg',
+      badge: '/icons/icon.svg',
+      tag:   'daily-reminder',
+      renotify: false,
+    })
+  );
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
+      const existing = cs.find(c => c.url.includes(self.location.origin));
+      if (existing) return existing.focus();
+      return clients.openWindow('/');
+    })
+  );
+});
+
 /* ── Fetch: routing strategy ──────────────────────────────────── */
 self.addEventListener('fetch', event => {
   const { request } = event;

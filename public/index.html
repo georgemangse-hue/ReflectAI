@@ -452,6 +452,15 @@
     <div id="tab-home" class="tab-pane" role="tabpanel" aria-label="Home">
       <div class="tab-scroll">
 
+        <!-- Push notification permission banner (shown once, dismissed to localStorage) -->
+        <div id="notif-permission-banner" class="notif-banner hidden" role="alert" aria-live="polite">
+          <span class="notif-banner-text">🔔 Get a daily reminder to journal?</span>
+          <div class="notif-banner-actions">
+            <button class="btn btn-sm btn-primary" onclick="enablePushNotifications()">Enable reminders</button>
+            <button class="btn btn-sm btn-ghost" onclick="dismissNotifBanner()">Not now</button>
+          </div>
+        </div>
+
         <div class="home-greeting-block">
           <div class="home-greeting" id="home-greeting">Good morning 🌿</div>
           <div class="home-date" id="home-date"></div>
@@ -869,6 +878,25 @@
             <button class="btn btn-primary btn-sm" onclick="submitChangePassword()">Update Password</button>
             <button class="btn btn-ghost btn-sm" onclick="toggleChangePassword()">Cancel</button>
           </div>
+        </div>
+
+        <!-- Daily reminder section -->
+        <div class="profile-reminder-section" id="profile-reminder-section">
+          <h3 class="profile-section-heading">Daily journal reminder</h3>
+          <div class="reminder-row">
+            <span class="reminder-label">Email reminder</span>
+            <label class="toggle-switch" aria-label="Enable email reminder">
+              <input type="checkbox" id="reminder-enabled-toggle" onchange="onReminderToggleChange()">
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+          <div id="reminder-time-row" class="reminder-time-row hidden">
+            <label for="reminder-time-select" class="reminder-time-label">Reminder time</label>
+            <select id="reminder-time-select" class="reminder-time-select"></select>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="saveReminderSettings()" id="save-reminder-btn">Save reminder</button>
+          <p class="reminder-save-msg hidden" id="reminder-save-msg">✓ Saved!</p>
+          <p class="reminder-note">Reminders are sent by email. Times are UTC+1 (Nigerian time).</p>
         </div>
 
         <!-- Pro billing section -->

@@ -402,7 +402,9 @@ function userShape(u) {
     createdAt:          u.createdAt,
     trial_start_date:   trialStart,
     trial_end_date:     trialEnd,
-    access_level:       accessLevel   // 'pro' | 'trial' | 'free'
+    access_level:       accessLevel,  // 'pro' | 'trial' | 'free'
+    reminder_enabled:   u.reminder_enabled   || false,
+    reminder_time:      u.reminder_time      || '20:00',
   };
 }
 
@@ -653,6 +655,57 @@ function generateReferralCode() {
     code = Array.from(bytes).map(b => chars[b % chars.length]).join('');
   } while (taken.has(code));
   return code;
+}
+
+function sendReminderEmail(email, firstName) {
+  const year    = new Date().getFullYear();
+  const name    = (firstName || 'there').slice(0, 30);
+  const appLink = APP_URL;
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+<body style="margin:0;padding:0;background:#f4f7f4;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f4;padding:40px 16px;">
+  <tr><td align="center">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.08);">
+      <tr>
+        <td style="background:#3a8f65;padding:28px 40px;text-align:center;">
+          <span style="font-size:22px;vertical-align:middle;">🌿</span>
+          <span style="color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.3px;vertical-align:middle;">&nbsp;ReflectAI</span>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:36px 40px 28px;">
+          <p style="font-size:17px;font-weight:600;color:#1b3028;margin:0 0 16px;">Hi ${name},</p>
+          <p style="font-size:15px;color:#3d5a4a;line-height:1.7;margin:0 0 14px;">
+            Just a gentle nudge — your journal is waiting for you today.
+          </p>
+          <p style="font-size:15px;color:#3d5a4a;line-height:1.7;margin:0 0 28px;">
+            Even 5 minutes of honest reflection can shift your whole perspective.
+          </p>
+          <table cellpadding="0" cellspacing="0" style="margin:0 auto 28px;">
+            <tr>
+              <td style="border-radius:8px;background:#3a8f65;">
+                <a href="${appLink}" style="display:block;padding:14px 32px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;letter-spacing:0.01em;">Open ReflectAI →</a>
+              </td>
+            </tr>
+          </table>
+          <p style="font-size:13px;color:#7a9a8a;line-height:1.6;margin:0;">
+            To turn off these reminders, visit your Profile settings inside the app.
+          </p>
+        </td>
+      </tr>
+      <tr>
+        <td style="border-top:1px solid #e8f0ea;padding:20px 40px;text-align:center;">
+          <p style="font-size:12px;color:#9ab8aa;margin:0;">Warm regards, The ReflectAI Team · © ${year} PremierLEADZ Consulting Ltd</p>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+  return sendEmail(email, 'Your daily reflection is waiting 🌿', html);
 }
 
 function sendReferralNotificationEmail(to, friendName) {
@@ -2312,6 +2365,25 @@ Your check-in should note any specific evidence from the journal entries that re
       return sendJSON(res, 200, { user: userShape(updated) });
     }
 
+    if (method === 'PATCH' && url === '/api/user/reminder') {
+      const user = requireAuth(req, res);
+      if (!user) return;
+      const { reminder_enabled, reminder_time } = await readBody(req);
+      // Validate time is a recognised 30-min slot between 06:00 and 22:00
+      const validTimes = new Set();
+      for (let h = 6; h <= 22; h++) {
+        validTimes.add(`${String(h).padStart(2,'0')}:00`);
+        if (h < 22) validTimes.add(`${String(h).padStart(2,'0')}:30`);
+      }
+      const time = validTimes.has(reminder_time) ? reminder_time : '20:00';
+      updateUser(user.id, {
+        reminder_enabled: reminder_enabled === true,
+        reminder_time:    time,
+      });
+      const updated = readJSON(USERS_FILE).find(u => u.id === user.id);
+      return sendJSON(res, 200, { user: userShape(updated) });
+    }
+
     /* ==============================================================
        STATIC FILES
     ============================================================== */
@@ -2359,4 +2431,51 @@ server.listen(PORT, '0.0.0.0', () => {
   if (!STRIPE_SECRET_KEY)        console.warn('  ℹ  STRIPE_SECRET_KEY not set — Stripe runs in test mode.\n');
   if (!STRIPE_PRICE_ID)          console.warn('  ℹ  STRIPE_PRICE_ID not set — create a recurring price in Stripe dashboard.\n');
   if (!process.env.ADMIN_SECRET) console.warn(`  ℹ  ADMIN_SECRET not set — using auto-generated key: ${ADMIN_SECRET}\n`);
+
+  startReminderJob();
 });
+
+/* ================================================================
+   DAILY REMINDER JOB
+================================================================ */
+function checkAndSendReminders() {
+  const now        = new Date();
+  // WAT = UTC+1; adjust so users' saved times match Nigerian clock
+  const watHour    = (now.getUTCHours() + 1) % 24;
+  const currentHH  = String(watHour).padStart(2, '0');
+  const todayISO   = new Date(now.getTime() + 3600000).toISOString().split('T')[0]; // WAT date
+
+  const users = readJSON(USERS_FILE);
+  let sent = 0;
+
+  for (const user of users) {
+    if (!user.reminder_enabled || !user.reminder_time) continue;
+    const [rHH] = user.reminder_time.split(':');
+    if (String(parseInt(rHH, 10)).padStart(2, '0') !== currentHH) continue;
+
+    // Skip if user has already journaled today (WAT)
+    const entries = readJSON(entriesFile(user.id));
+    if (entries.some(e => e.date === todayISO)) continue;
+
+    const firstName = (user.firstName || '').trim() || user.email.split('@')[0];
+    sendReminderEmail(user.email, firstName)
+      .then(() => console.log(`[reminder] sent to ${user.email}`))
+      .catch(err => console.error('[reminder] failed for', user.email, err.message));
+    sent++;
+  }
+
+  if (sent > 0) console.log(`[reminder] ${sent} reminder(s) dispatched at WAT hour ${currentHH}`);
+}
+
+function startReminderJob() {
+  // Align first fire to the top of the next UTC hour
+  const now          = new Date();
+  const msToNextHour = (60 - now.getUTCMinutes()) * 60000
+                     - now.getUTCSeconds() * 1000
+                     - now.getUTCMilliseconds();
+  setTimeout(() => {
+    checkAndSendReminders();
+    setInterval(checkAndSendReminders, 60 * 60 * 1000);
+  }, msToNextHour);
+  console.log(`  ✓  Reminder job ready — first check in ~${Math.round(msToNextHour / 60000)} min(s)\n`);
+}
