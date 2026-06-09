@@ -820,6 +820,54 @@ async function applyReferralCredit(paidUser) {
 
 const VALID_MOODS = ['motivated', 'happy', 'grateful', 'tired', 'anxious', 'sad', 'overwhelmed'];
 
+const JOURNAL_MOOD_SCORES = {
+  motivated: 5, happy: 5, grateful: 4, okay: 3,
+  tired: 2, anxious: 2, sad: 1, overwhelmed: 1
+};
+
+// Write a mood_logs entry for a given user/date whenever a journal entry has a mood.
+// Does NOT overwrite an existing mood_log for that date (quick check-in takes priority).
+function bridgeMoodToLog(userId, date, mood) {
+  if (!mood || !(mood in JOURNAL_MOOD_SCORES)) return;
+  const score = JOURNAL_MOOD_SCORES[mood];
+  const logs  = readJSON(moodLogsFile(userId));
+  const existing = logs.findIndex(l => l.date === date);
+  const entry = { date, mood, score, createdAt: Date.now(), source: 'journal' };
+  if (existing !== -1) {
+    logs[existing] = entry;
+  } else {
+    logs.unshift(entry);
+    logs.sort((a, b) => b.date.localeCompare(a.date));
+  }
+  writeJSON(moodLogsFile(userId), logs);
+}
+
+// One-time backfill: copy any journal-entry mood into mood_logs for dates that have no log yet.
+function backfillMoodLogs() {
+  try {
+    const users = readJSON(USERS_FILE);
+    let total = 0;
+    for (const user of users) {
+      const entries = readJSON(entriesFile(user.id));
+      const logs    = readJSON(moodLogsFile(user.id));
+      const logDates = new Set(logs.map(l => l.date));
+      for (const e of entries) {
+        if (e.mood && JOURNAL_MOOD_SCORES[e.mood] && !logDates.has(e.date)) {
+          const score = JOURNAL_MOOD_SCORES[e.mood];
+          logs.push({ date: e.date, mood: e.mood, score, createdAt: e.createdAt || Date.now(), source: 'journal' });
+          logDates.add(e.date);
+          total++;
+        }
+      }
+      if (total > 0) {
+        logs.sort((a, b) => b.date.localeCompare(a.date));
+        writeJSON(moodLogsFile(user.id), logs);
+      }
+    }
+    if (total > 0) console.log(`[backfill] Bridged ${total} journal mood(s) into mood_logs`);
+  } catch (e) { console.error('[backfill] Error:', e.message); }
+}
+
 /* ================================================================
    MAIN SERVER
 ================================================================ */
@@ -1775,6 +1823,7 @@ const server = http.createServer(async (req, res) => {
       const idx = entries.findIndex(e => e.date === date);
       if (idx !== -1) entries[idx] = entry; else entries.unshift(entry);
       writeJSON(entriesFile(user.id), entries);
+      if (entry.mood) bridgeMoodToLog(user.id, date, entry.mood);
       return sendJSON(res, 200, { entry, streak: computeStreak(entries) });
     }
 
@@ -1804,6 +1853,7 @@ const server = http.createServer(async (req, res) => {
       if (coachSummary !== undefined) entries[idx].coachSummary = typeof coachSummary === 'string' ? coachSummary.trim().slice(0, 5000) : null;
       entries[idx].updatedAt = Date.now();
       writeJSON(entriesFile(user.id), entries);
+      if (entries[idx].mood) bridgeMoodToLog(user.id, entryDate, entries[idx].mood);
       return sendJSON(res, 200, { entry: entries[idx] });
     }
 
@@ -2420,6 +2470,8 @@ Your check-in should note any specific evidence from the journal entries that re
     sendJSON(res, 500, { error: err.message });
   }
 });
+
+backfillMoodLogs();
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log('');
