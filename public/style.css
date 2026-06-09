@@ -1211,10 +1211,131 @@ footer {
 
 
 /* ================================================================
-   21. DARK MODE
+   21. JOURNAL THEMES
+   Applied via data-journal-theme attribute on <html>.
+   Placed BEFORE dark-mode block so [data-theme="dark"] always wins
+   when both are active.
+================================================================ */
+
+/* — Midnight — */
+[data-journal-theme="midnight"] {
+  --bg:            #1a1a2e;
+  --surface:       #16213e;
+  --surface-2:     #0f1828;
+  --primary:       #7F77DD;
+  --primary-dark:  #6860c4;
+  --primary-light: rgba(127, 119, 221, 0.18);
+  --accent:        #a09ae0;
+  --text:          #e8e8f0;
+  --text-muted:    #9898b8;
+  --border:        #2e2e50;
+  --border-light:  #22224a;
+  --error-bg:      #2c1530;
+  --error-text:    #f87171;
+  --error-border:  #7f1d3d;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.45);
+  --shadow:    0 4px 18px rgba(0,0,0,0.55);
+  --shadow-lg: 0 12px 36px rgba(0,0,0,0.7);
+}
+[data-journal-theme="midnight"] nav::before {
+  background: rgba(22, 33, 62, 0.95);
+}
+[data-journal-theme="midnight"] .mobile-nav {
+  background: rgba(22, 33, 62, 0.97);
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+}
+
+/* — Sunrise — */
+[data-journal-theme="sunrise"] {
+  --bg:            #fff8f0;
+  --surface:       #ffffff;
+  --surface-2:     #fef3e7;
+  --primary:       #E8A020;
+  --primary-dark:  #c88418;
+  --primary-light: #fdf0dc;
+  --accent:        #f0b840;
+  --text:          #2d1f0e;
+  --text-muted:    #7a5c3a;
+  --border:        #f0d8a8;
+  --border-light:  #fae8c8;
+  --shadow-sm: 0 1px 3px rgba(120,60,0,0.06);
+  --shadow:    0 4px 18px rgba(120,60,0,0.09);
+  --shadow-lg: 0 12px 36px rgba(120,60,0,0.14);
+}
+[data-journal-theme="sunrise"] nav::before {
+  background: rgba(255, 248, 240, 0.92);
+}
+
+/* — Ocean — */
+[data-journal-theme="ocean"] {
+  --bg:            #f0f7ff;
+  --surface:       #ffffff;
+  --surface-2:     #e4f0fc;
+  --primary:       #378ADD;
+  --primary-dark:  #2868b8;
+  --primary-light: #d8eeff;
+  --accent:        #68a8e0;
+  --text:          #0d2137;
+  --text-muted:    #3a5a78;
+  --border:        #a8c8e8;
+  --border-light:  #cce0f4;
+  --shadow-sm: 0 1px 3px rgba(0,40,100,0.06);
+  --shadow:    0 4px 18px rgba(0,40,100,0.09);
+  --shadow-lg: 0 12px 36px rgba(0,40,100,0.14);
+}
+[data-journal-theme="ocean"] nav::before {
+  background: rgba(240, 247, 255, 0.92);
+}
+
+/* — Rose — */
+[data-journal-theme="rose"] {
+  --bg:            #fff5f5;
+  --surface:       #ffffff;
+  --surface-2:     #feecec;
+  --primary:       #E05555;
+  --primary-dark:  #c03e3e;
+  --primary-light: #fee0e0;
+  --accent:        #e87880;
+  --text:          #2d0f0f;
+  --text-muted:    #7a3a3a;
+  --border:        #f0b8b8;
+  --border-light:  #fadede;
+  --shadow-sm: 0 1px 3px rgba(100,0,0,0.06);
+  --shadow:    0 4px 18px rgba(100,0,0,0.09);
+  --shadow-lg: 0 12px 36px rgba(100,0,0,0.14);
+}
+[data-journal-theme="rose"] nav::before {
+  background: rgba(255, 245, 245, 0.92);
+}
+
+/* — Monochrome — */
+[data-journal-theme="mono"] {
+  --bg:            #f5f5f5;
+  --surface:       #ffffff;
+  --surface-2:     #eeeeee;
+  --primary:       #333333;
+  --primary-dark:  #1a1a1a;
+  --primary-light: #e8e8e8;
+  --accent:        #666666;
+  --text:          #1a1a1a;
+  --text-muted:    #666666;
+  --border:        #d0d0d0;
+  --border-light:  #e8e8e8;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow:    0 4px 18px rgba(0,0,0,0.10);
+  --shadow-lg: 0 12px 36px rgba(0,0,0,0.15);
+}
+[data-journal-theme="mono"] nav::before {
+  background: rgba(245, 245, 245, 0.92);
+}
+
+
+/* ================================================================
+   22. DARK MODE
    Applied when <html data-theme="dark">.
    Overrides design tokens first; explicit rule overrides follow for
    anything that uses hard-coded colour values instead of variables.
+   Dark mode is ordered AFTER journal themes, so it always wins.
 ================================================================ */
 [data-theme="dark"] {
   --bg:            #0d1a11;
@@ -3975,4 +4096,74 @@ footer {
   background: var(--surface-2);
   border-color: rgba(255,255,255,0.15);
   color: #d0e8da;
+}
+
+
+/* ================================================================
+   40. JOURNAL THEME PICKER (Profile tab)
+================================================================ */
+.profile-theme-section {
+  margin: 1.25rem 0;
+  padding: 1.1rem 1.25rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+}
+.theme-swatches {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.theme-swatch-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  position: relative;
+}
+.theme-swatch {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2.5px solid transparent;
+  outline: 2.5px solid transparent;
+  outline-offset: 2px;
+  cursor: pointer;
+  transition: outline 0.15s, transform 0.12s;
+  position: relative;
+  background-clip: padding-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.theme-swatch:hover { transform: scale(1.1); }
+.theme-swatch.active {
+  outline: 2.5px solid var(--primary);
+}
+.theme-swatch.locked { cursor: default; opacity: 0.72; }
+.theme-swatch.locked:hover { transform: none; }
+.theme-swatch-lock {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.38);
+  color: #fff;
+  font-size: 12px;
+  pointer-events: none;
+}
+.theme-swatch-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-align: center;
+}
+.theme-save-msg {
+  font-size: 0.82rem;
+  color: var(--primary);
+  margin: 0.5rem 0 0;
+  font-weight: 600;
 }

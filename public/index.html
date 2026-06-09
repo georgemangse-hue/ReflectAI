@@ -18,6 +18,8 @@
       var saved = localStorage.getItem('reflectai_theme');
       var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       document.documentElement.setAttribute('data-theme', saved || (prefersDark ? 'dark' : 'light'));
+      var jt = localStorage.getItem('reflectai_journal_theme');
+      if (jt && jt !== 'forest') document.documentElement.setAttribute('data-journal-theme', jt);
     })();
   </script>
   <!-- Chart.js for Insights mood graph -->
@@ -878,6 +880,14 @@
             <button class="btn btn-primary btn-sm" onclick="submitChangePassword()">Update Password</button>
             <button class="btn btn-ghost btn-sm" onclick="toggleChangePassword()">Cancel</button>
           </div>
+        </div>
+
+        <!-- Journal theme picker -->
+        <div class="profile-theme-section" id="profile-theme-section">
+          <h3 class="profile-section-heading">Personalise your journal</h3>
+          <div class="theme-swatches" id="theme-swatches" role="group" aria-label="Journal themes"></div>
+          <button class="btn btn-primary btn-sm" onclick="saveJournalTheme()" id="save-theme-btn">Save theme</button>
+          <p class="theme-save-msg hidden" id="theme-save-msg">✓ Theme saved!</p>
         </div>
 
         <!-- Daily reminder section -->
