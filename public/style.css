@@ -1509,6 +1509,15 @@ footer {
   margin-top: 1.25rem;
 }
 
+.auth-privacy-link,
+.payment-privacy-policy-link {
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.auth-privacy-link:hover,
+.payment-privacy-policy-link:hover { color: var(--primary); }
+
 
 /* ================================================================
    23. PLAN BADGES

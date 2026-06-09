@@ -42,6 +42,7 @@ const FLUTTERWAVE_PUBLIC_KEY     = process.env.FLUTTERWAVE_PUBLIC_KEY     || '';
 const FLUTTERWAVE_SECRET_KEY     = process.env.FLUTTERWAVE_SECRET_KEY     || '';
 const APP_URL                    = process.env.APP_URL                    || `http://localhost:${PORT}`;
 const ADMIN_SECRET           = process.env.ADMIN_SECRET           || crypto.randomBytes(16).toString('hex');
+const ENTRIES_ENCRYPTION_KEY = process.env.ENTRIES_ENCRYPTION_KEY || '';
 const ADMIN_EMAIL            = (process.env.ADMIN_EMAIL || process.env.SMTP_USER || '').toLowerCase().trim();
 const GMAIL_APP_PASSWORD     = process.env.GMAIL_APP_PASSWORD     || '';
 const SMTP_USER              = process.env.SMTP_USER              || 'georgemangse@gmail.com';
@@ -229,6 +230,61 @@ const moodLogsFile     = uid => path.join(MOOD_LOGS_DIR,    `${uid}.json`);
 const weeklyInsightFile = uid => path.join(WEEKLY_INSIGHTS_DIR, `${uid}.json`);
 
 const VALID_QUICK_MOODS = ['awful', 'meh', 'okay', 'good', 'great'];
+
+/* ================================================================
+   Entries encryption at rest (AES-256-GCM)
+   Set ENTRIES_ENCRYPTION_KEY to a 64-char hex string (32 bytes).
+   Generate one with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+================================================================ */
+const ENCRYPTION_ENABLED = ENTRIES_ENCRYPTION_KEY.length === 64;
+const ENCRYPTION_KEY_BUF = ENCRYPTION_ENABLED ? Buffer.from(ENTRIES_ENCRYPTION_KEY, 'hex') : null;
+
+function _encryptEntries(data) {
+  const iv     = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_KEY_BUF, iv);
+  const ct     = Buffer.concat([cipher.update(JSON.stringify(data), 'utf8'), cipher.final()]);
+  return JSON.stringify({ v: 1, iv: iv.toString('hex'), tag: cipher.getAuthTag().toString('hex'), ct: ct.toString('hex') });
+}
+
+function _decryptEntries(raw) {
+  const { v, iv, tag, ct } = JSON.parse(raw);
+  if (v !== 1) throw new Error('Unknown entries encryption version');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', ENCRYPTION_KEY_BUF, Buffer.from(iv, 'hex'));
+  decipher.setAuthTag(Buffer.from(tag, 'hex'));
+  return JSON.parse(Buffer.concat([decipher.update(Buffer.from(ct, 'hex')), decipher.final()]).toString('utf8'));
+}
+
+function readEntries(uid) {
+  const fpath = entriesFile(uid);
+  if (!fs.existsSync(fpath)) return [];
+  const raw = fs.readFileSync(fpath, 'utf8').trim();
+  if (!raw) return [];
+  // Detect plaintext JSON (starts with '[') — handles unencrypted legacy files
+  if (!ENCRYPTION_ENABLED || raw.startsWith('[')) return JSON.parse(raw);
+  return _decryptEntries(raw);
+}
+
+function writeEntries(uid, data) {
+  const content = ENCRYPTION_ENABLED ? _encryptEntries(data) : JSON.stringify(data, null, 2);
+  fs.writeFileSync(entriesFile(uid), content, 'utf8');
+}
+
+function migrateEntriesToEncryption() {
+  if (!ENCRYPTION_ENABLED) return;
+  try {
+    const users = readJSON(USERS_FILE);
+    let count = 0;
+    for (const user of users) {
+      const fpath = entriesFile(user.id);
+      if (!fs.existsSync(fpath)) continue;
+      const raw = fs.readFileSync(fpath, 'utf8').trim();
+      if (!raw || !raw.startsWith('[')) continue; // empty or already encrypted
+      fs.writeFileSync(fpath, _encryptEntries(JSON.parse(raw)), 'utf8');
+      count++;
+    }
+    if (count > 0) console.log(`[encrypt] Migrated ${count} entries file(s) to AES-256-GCM encrypted storage`);
+  } catch (e) { console.error('[encrypt] Migration error:', e.message); }
+}
 
 /* ================================================================
    Crypto / auth helpers
@@ -848,7 +904,7 @@ function backfillMoodLogs() {
     const users = readJSON(USERS_FILE);
     let total = 0;
     for (const user of users) {
-      const entries = readJSON(entriesFile(user.id));
+      const entries = readEntries(user.id);
       const logs    = readJSON(moodLogsFile(user.id));
       const logDates = new Set(logs.map(l => l.date));
       for (const e of entries) {
@@ -897,7 +953,7 @@ const server = http.createServer(async (req, res) => {
       const sessions = readJSON(SESSIONS_FILE);
       const now      = Date.now();
       const rows  = users.map(u => {
-        const entries    = readJSON(entriesFile(u.id));
+        const entries    = readEntries(u.id);
         const lastEntry  = entries.reduce((max, e) => Math.max(max, e.createdAt || 0), 0);
         const userSessions = sessions.filter(s => s.userId === u.id);
         const lastSession  = userSessions.reduce((max, s) => Math.max(max, s.expiresAt - SESSION_TTL), 0);
@@ -1285,7 +1341,7 @@ const server = http.createServer(async (req, res) => {
     if (method === 'GET' && url === '/api/auth/me') {
       const user = requireAuth(req, res);
       if (!user) return;
-      const entries = readJSON(entriesFile(user.id));
+      const entries = readEntries(user.id);
       return sendJSON(res, 200, {
         user: userShape(user),
         streak: computeStreak(entries),
@@ -1801,7 +1857,7 @@ const server = http.createServer(async (req, res) => {
     if (method === 'GET' && url === '/api/entries') {
       const user = requireAuth(req, res);
       if (!user) return;
-      const entries = readJSON(entriesFile(user.id));
+      const entries = readEntries(user.id);
       return sendJSON(res, 200, { entries, streak: computeStreak(entries) });
     }
 
@@ -1812,7 +1868,7 @@ const server = http.createServer(async (req, res) => {
       if (!date || !text || text.trim().length < 10)
         return sendJSON(res, 400, { error: 'Entry text is too short.' });
 
-      const entries  = readJSON(entriesFile(user.id));
+      const entries  = readEntries(user.id);
       const isUpdate = entries.some(e => e.date === date);
 
       const entry = {
@@ -1822,7 +1878,7 @@ const server = http.createServer(async (req, res) => {
       };
       const idx = entries.findIndex(e => e.date === date);
       if (idx !== -1) entries[idx] = entry; else entries.unshift(entry);
-      writeJSON(entriesFile(user.id), entries);
+      writeEntries(user.id, entries);
       if (entry.mood) bridgeMoodToLog(user.id, date, entry.mood);
       return sendJSON(res, 200, { entry, streak: computeStreak(entries) });
     }
@@ -1830,7 +1886,7 @@ const server = http.createServer(async (req, res) => {
     if (method === 'DELETE' && url === '/api/entries') {
       const user = requireAuth(req, res);
       if (!user) return;
-      writeJSON(entriesFile(user.id), []);
+      writeEntries(user.id, []);
       return sendJSON(res, 200, { ok: true });
     }
 
@@ -1840,7 +1896,7 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       const entryDate      = entryEditMatch[1];
       const { text, mood, coachSummary } = await readBody(req);
-      const entries        = readJSON(entriesFile(user.id));
+      const entries        = readEntries(user.id);
       const idx            = entries.findIndex(e => e.date === entryDate);
       if (idx === -1) return sendJSON(res, 404, { error: 'Entry not found.' });
 
@@ -1852,7 +1908,7 @@ const server = http.createServer(async (req, res) => {
       if (mood !== undefined) entries[idx].mood = VALID_MOODS.includes(mood) ? mood : null;
       if (coachSummary !== undefined) entries[idx].coachSummary = typeof coachSummary === 'string' ? coachSummary.trim().slice(0, 5000) : null;
       entries[idx].updatedAt = Date.now();
-      writeJSON(entriesFile(user.id), entries);
+      writeEntries(user.id, entries);
       if (entries[idx].mood) bridgeMoodToLog(user.id, entryDate, entries[idx].mood);
       return sendJSON(res, 200, { entry: entries[idx] });
     }
@@ -1864,7 +1920,7 @@ const server = http.createServer(async (req, res) => {
       const user = requirePro(req, res);
       if (!user) return;
 
-      const entries    = readJSON(entriesFile(user.id)).sort((a, b) => b.date.localeCompare(a.date));
+      const entries    = readEntries(user.id).sort((a, b) => b.date.localeCompare(a.date));
       const moodLogs   = readJSON(moodLogsFile(user.id));
       const moodByDate = {};
       moodLogs.forEach(l => { moodByDate[l.date] = l.mood; });
@@ -2163,7 +2219,7 @@ Rules:
       }
       if (!API_KEY) return sendJSON(res, 500, { error: 'ANTHROPIC_API_KEY is not configured.' });
 
-      const entries = readJSON(entriesFile(user.id)).slice(0, 7);
+      const entries = readEntries(user.id).slice(0, 7);
       if (!entries.length)
         return sendJSON(res, 200, { insight: "You haven't written any entries yet. Start journaling daily and come back here for your first weekly insight!" });
 
@@ -2278,7 +2334,7 @@ Voice: second person only ("you", "your"). Flowing prose, no bullets or headers.
       const goal    = goals.find(g => g.id === goalId);
       if (!goal) return sendJSON(res, 404, { error: 'Goal not found.' });
 
-      const entries   = readJSON(entriesFile(user.id)).slice(0, 7);
+      const entries   = readEntries(user.id).slice(0, 7);
       const formatted = entries.length
         ? entries.map((e, i) => `Entry ${i + 1} (${e.date}):\n${e.text}`).join('\n\n---\n\n')
         : 'No recent journal entries.';
@@ -2344,7 +2400,7 @@ Your check-in should note any specific evidence from the journal entries that re
       const weekKey      = weekStartISO;
 
       // Always compute fresh stats (cheap: just reads local JSON files)
-      const entries     = readJSON(entriesFile(user.id));
+      const entries     = readEntries(user.id);
       const weekEntries = entries.filter(e => e.date >= weekStartISO && e.date <= today);
       const totalWords  = weekEntries.reduce((s, e) => s + (e.text ? e.text.trim().split(/\s+/).length : 0), 0);
 
@@ -2471,6 +2527,7 @@ Your check-in should note any specific evidence from the journal entries that re
   }
 });
 
+migrateEntriesToEncryption();
 backfillMoodLogs();
 
 server.listen(PORT, '0.0.0.0', () => {
@@ -2500,6 +2557,8 @@ server.listen(PORT, '0.0.0.0', () => {
   if (!STRIPE_SECRET_KEY)        console.warn('  ℹ  STRIPE_SECRET_KEY not set — Stripe runs in test mode.\n');
   if (!STRIPE_PRICE_ID)          console.warn('  ℹ  STRIPE_PRICE_ID not set — create a recurring price in Stripe dashboard.\n');
   if (!process.env.ADMIN_SECRET) console.warn(`  ℹ  ADMIN_SECRET not set — using auto-generated key: ${ADMIN_SECRET}\n`);
+  if (!ENCRYPTION_ENABLED) console.warn('  ⚠  ENTRIES_ENCRYPTION_KEY not set — entries stored as plaintext. Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"\n');
+  else console.log('  🔒 Entries encryption at rest: enabled (AES-256-GCM)\n');
 
   startReminderJob();
 });
@@ -2523,7 +2582,7 @@ function checkAndSendReminders() {
     if (String(parseInt(rHH, 10)).padStart(2, '0') !== currentHH) continue;
 
     // Skip if user has already journaled today (WAT)
-    const entries = readJSON(entriesFile(user.id));
+    const entries = readEntries(user.id);
     if (entries.some(e => e.date === todayISO)) continue;
 
     const firstName = (user.firstName || '').trim() || user.email.split('@')[0];

@@ -16,6 +16,8 @@
     .policy-page a { color: var(--primary); }
     .back-link { display: inline-block; margin-bottom: 2rem; font-size: 0.9rem; color: var(--primary); text-decoration: none; }
     .back-link:hover { text-decoration: underline; }
+    .policy-commitments { background: var(--surface-alt, #f4faf7); border: 1px solid var(--border-light, #d4ede3); border-radius: 10px; padding: 1rem 1.25rem; margin: 1.5rem 0; }
+    .policy-commitments li { color: var(--text); font-weight: 500; }
   </style>
 </head>
 <body>
@@ -30,15 +32,24 @@
   <main class="policy-page">
     <a href="/" class="back-link">← Back to ReflectAI</a>
     <h1>Privacy Policy</h1>
-    <p class="updated">Last updated: May 2026</p>
+    <p class="updated">Last updated: June 2026</p>
 
     <p>ReflectAI is operated by <strong>PremierLEADZ Consulting Ltd</strong>, a company registered in Nigeria ("we", "us", or "our"). This policy explains what personal data we collect, how we use it, and your rights regarding that data.</p>
 
+    <div class="policy-commitments">
+      <ul>
+        <li>We never sell or share your journal entries with third parties.</li>
+        <li>We never use your entries to train AI models.</li>
+        <li>You can request deletion of your data at any time.</li>
+        <li>Entry files are encrypted at rest on our servers (AES-256-GCM).</li>
+      </ul>
+    </div>
+
     <h2>1. Data We Collect</h2>
     <ul>
-      <li><strong>Account data:</strong> your email address and a securely hashed version of your password.</li>
-      <li><strong>Journal content:</strong> entries, goals, and reflections you create inside the app.</li>
-      <li><strong>Payment data:</strong> transaction records (amount, date, status). We do not store your card details — these are handled entirely by Paystack or Stripe.</li>
+      <li><strong>Account data:</strong> your email address and a securely hashed version of your password. Your password is never stored in plain text.</li>
+      <li><strong>Journal content:</strong> entries, goals, mood logs, and reflections you create inside the app.</li>
+      <li><strong>Payment data:</strong> transaction records (amount, date, status). We do not store your card details — these are handled entirely by Paystack or Flutterwave.</li>
       <li><strong>Feedback:</strong> any responses you voluntarily submit through the in-app feedback form.</li>
       <li><strong>Usage data:</strong> basic, anonymous information such as which features you use, to help us improve the product.</li>
     </ul>
@@ -47,18 +58,27 @@
     <ul>
       <li>To create and manage your account.</li>
       <li>To deliver the journaling, goals, and AI-powered features you use.</li>
-      <li>To process your subscription payments via Paystack or Stripe.</li>
-      <li>To send transactional emails (e.g. account confirmation, payment receipts).</li>
+      <li>To process your subscription payments via Paystack or Flutterwave.</li>
+      <li>To send transactional emails (e.g. account confirmation, payment receipts, daily reminders if you opt in).</li>
       <li>To analyse aggregate, anonymous usage patterns and improve ReflectAI.</li>
-      <li>We do <strong>not</strong> sell, rent, or trade your personal data to third parties.</li>
-      <li>We do <strong>not</strong> use your journal entries to train AI models.</li>
+      <li>We do <strong>not</strong> sell, rent, or trade your personal data to third parties — ever.</li>
+      <li>We do <strong>not</strong> use your journal entries to train AI models — ever.</li>
     </ul>
 
-    <h2>3. AI Features</h2>
-    <p>When you use AI-powered features (daily check-ins, weekly insights), your journal content is sent to Anthropic's API to generate a personalised response. This processing is governed by <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">Anthropic's privacy policy</a>. No content is stored by Anthropic beyond what is needed to complete the request.</p>
+    <h2>3. AI Features &amp; How Your Entries Are Processed</h2>
+    <p>ReflectAI uses Anthropic's Claude API to power several features. When you use these features, relevant portions of your journal entries are sent to Anthropic's servers to generate a response:</p>
+    <ul>
+      <li><strong>AI reflection prompts</strong> — sent after you save a journal entry to suggest follow-up questions.</li>
+      <li><strong>AI coaching sessions</strong> — your entry text is included so the AI can respond with context.</li>
+      <li><strong>Weekly AI insight summaries</strong> — up to five recent entries are sent to generate your weekly reflection.</li>
+      <li><strong>AI goal check-ins</strong> — recent entries are reviewed to find evidence of goal progress.</li>
+    </ul>
+    <p>This processing is governed by <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">Anthropic's privacy policy</a>. Anthropic does not use API inputs to train its models. Content is not stored by Anthropic beyond what is needed to complete each individual request.</p>
+    <p>No entry content is shared with any other third party for any purpose.</p>
 
-    <h2>4. Data Storage & Security</h2>
-    <p>Your data is stored on secure servers provided by Railway (railway.app). We take reasonable technical measures to protect your data against unauthorised access. However, no system is completely secure — please use a strong, unique password for your account.</p>
+    <h2>4. Data Storage &amp; Security</h2>
+    <p>Your data is stored on secure servers provided by Railway (railway.app). Journal entry files are encrypted at rest using AES-256-GCM encryption. Passwords are hashed using PBKDF2 with a unique salt per account. We take reasonable technical measures to protect your data against unauthorised access.</p>
+    <p>No system is completely secure — please use a strong, unique password for your account.</p>
 
     <h2>5. Data Retention</h2>
     <p>We retain your data for as long as your account is active. If you close your account, we will delete your personal data within 30 days, except where we are required to retain records for legal or tax purposes.</p>
@@ -67,7 +87,7 @@
     <ul>
       <li><strong>Access:</strong> you may request a copy of the data we hold about you.</li>
       <li><strong>Correction:</strong> you may ask us to correct inaccurate data.</li>
-      <li><strong>Deletion:</strong> you may request that we delete your account and all associated data.</li>
+      <li><strong>Deletion:</strong> you may request that we delete your account and all associated data at any time. We will action this within 14 days.</li>
     </ul>
     <p>To exercise any of these rights, contact us at <a href="mailto:georgemangse@gmail.com">georgemangse@gmail.com</a>. We will respond within 14 days.</p>
 
