@@ -2468,15 +2468,6 @@ footer {
   gap: 0.35rem;
 }
 
-.payment-option-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin: 0;
-}
-
 .payment-divider {
   display: flex;
   align-items: center;
@@ -2504,14 +2495,20 @@ footer {
   text-align: center;
 }
 
+.btn-paystack {
+  background: #1D9E75 !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+}
+
+.btn-paystack:hover {
+  background: #178a64 !important;
+}
+
 .payment-security {
   font-size: 0.8rem;
   color: var(--text-muted);
   margin-bottom: 0.6rem;
-}
-
-.payment-logout-row {
-  margin-top: 0.2rem;
 }
 
 
