@@ -283,6 +283,50 @@
 /* ================================================================
    52. JOURNAL TAB
 ================================================================ */
+/* Next-day continuity banner */
+.continuity-banner {
+  position: relative;
+  background: #E1F5EE;
+  border-left: 3px solid #1D9E75;
+  border-radius: var(--radius-sm);
+  padding: 0.9rem 2.25rem 0.9rem 1rem;
+  margin-bottom: 1rem;
+}
+.continuity-text {
+  font-size: 0.85rem;
+  color: var(--text);
+  line-height: 1.6;
+  margin: 0;
+}
+.continuity-theme { color: #1D9E75; font-weight: 600; }
+.continuity-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+.continuity-btn {
+  flex: 1;
+  min-width: 120px;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.8rem;
+  white-space: normal;
+  line-height: 1.25;
+}
+.continuity-dismiss {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.7rem;
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.2rem;
+}
+.continuity-dismiss:hover { color: var(--text); }
+
 /* Entry history strip */
 .entry-strip {
   display: flex;

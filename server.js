@@ -580,9 +580,9 @@ const getPaystackSubscription    = code => paystackRequest('GET', `/subscription
 const disablePaystackSubscription = (code, token) =>
   paystackRequest('POST', '/subscription/disable', { code, token });
 
-function callClaude(messages, systemPrompt, maxTokens = 1024) {
+function callClaude(messages, systemPrompt, maxTokens = 1024, model = 'claude-sonnet-4-6') {
   return new Promise((resolve, reject) => {
-    const payload = JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: maxTokens, system: systemPrompt, messages });
+    const payload = JSON.stringify({ model, max_tokens: maxTokens, system: systemPrompt, messages });
     const options = {
       hostname: 'api.anthropic.com',
       path: '/v1/messages',
@@ -609,6 +609,13 @@ function callClaude(messages, systemPrompt, maxTokens = 1024) {
     req.write(payload);
     req.end();
   });
+}
+
+// Coarse keyword check used only to suppress the cliffhanger/theme-continuity
+// feature on crisis-adjacent entries — not a clinical safety system.
+const CRISIS_LANGUAGE_PATTERN = /\b(kill myself|killing myself|end my life|ending my life|want(?:ed)? to die|wish i (?:was|were) dead|don'?t want to (?:be alive|live)|no reason to live|better off dead|suicid\w*|self[\s-]?harm|hurt(?:ing)? myself|cutting myself|can'?t go on|can'?t do this anymore)\b/i;
+function containsCrisisLanguage(text) {
+  return CRISIS_LANGUAGE_PATTERN.test(String(text || ''));
 }
 
 function escapeEmailText(str) {
@@ -1900,7 +1907,7 @@ const server = http.createServer(async (req, res) => {
       const user = requireAuth(req, res);
       if (!user) return;
       const entryDate      = entryEditMatch[1];
-      const { text, mood, coachSummary } = await readBody(req);
+      const { text, mood, coachSummary, tomorrowsTheme, clearTomorrowsTheme } = await readBody(req);
       const entries        = readEntries(user.id);
       const idx            = entries.findIndex(e => e.date === entryDate);
       if (idx === -1) return sendJSON(res, 404, { error: 'Entry not found.' });
@@ -1912,6 +1919,8 @@ const server = http.createServer(async (req, res) => {
       }
       if (mood !== undefined) entries[idx].mood = VALID_MOODS.includes(mood) ? mood : null;
       if (coachSummary !== undefined) entries[idx].coachSummary = typeof coachSummary === 'string' ? coachSummary.trim().slice(0, 5000) : null;
+      if (clearTomorrowsTheme) delete entries[idx].tomorrowsTheme;
+      else if (tomorrowsTheme !== undefined) entries[idx].tomorrowsTheme = typeof tomorrowsTheme === 'string' ? tomorrowsTheme.trim().slice(0, 60) : null;
       entries[idx].updatedAt = Date.now();
       writeEntries(user.id, entries);
       if (entries[idx].mood) bridgeMoodToLog(user.id, entryDate, entries[idx].mood);
@@ -2201,6 +2210,29 @@ Rules:
       const result  = await callClaude(trimmed, systemPrompt + closingGuidance);
       const message = result.content[0].text;
       return sendJSON(res, 200, { message, exchangesDone: exchangeRequested, coachLimit });
+    }
+
+    if (method === 'POST' && url === '/api/theme-extract') {
+      const user = requirePro(req, res);
+      if (!user) return;
+
+      const { entry } = await readBody(req);
+      if (!entry || !entry.trim()) return sendJSON(res, 200, { theme: null });
+
+      if (!API_KEY || containsCrisisLanguage(entry)) return sendJSON(res, 200, { theme: null });
+
+      try {
+        const systemPrompt = `Read this journal entry and identify ONE core theme in 3 words or less. Examples: "feeling stuck", "career uncertainty", "relationship tension", "self doubt", "loss of motivation", "gratitude", "fear of change". Return only the 3-word theme, nothing else.`;
+        const result = await callClaude(
+          [{ role: 'user', content: entry.trim().slice(0, 4000) }],
+          systemPrompt, 20, 'claude-haiku-4-5-20251001'
+        );
+        let theme = (result.content[0]?.text || '').trim().replace(/^["'.]+|["'.]+$/g, '');
+        if (!theme || theme.split(/\s+/).length > 5 || theme.length > 60) theme = null;
+        return sendJSON(res, 200, { theme });
+      } catch {
+        return sendJSON(res, 200, { theme: null });
+      }
     }
 
     if (method === 'POST' && url === '/api/weekly-insight') {

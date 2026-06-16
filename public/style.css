@@ -3177,6 +3177,30 @@ footer {
 }
 .session-upgrade-link:hover { opacity: 0.75; }
 
+.cliffhanger-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  text-align: left;
+  margin: 1rem -2rem -1.5rem;
+  padding: 0.85rem 2rem;
+  border-top: 1px solid #E1F5EE;
+  background: #f7faf7;
+  border-radius: 0 0 var(--radius) var(--radius);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.cliffhanger-section.visible { opacity: 1; transform: translateY(0); }
+.cliffhanger-leaf { font-size: 0.9rem; line-height: 1.6; flex-shrink: 0; }
+.cliffhanger-text {
+  font-size: 13px;
+  color: #555;
+  line-height: 1.6;
+  margin: 0;
+}
+.cliffhanger-theme { color: #1D9E75; font-weight: 600; }
+
 
 /* ================================================================
    ONBOARDING OVERLAY

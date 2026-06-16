@@ -1458,6 +1458,8 @@ async function sendCoachMessage(index) {
       if (inputRow) inputRow.classList.add('hidden');
       // Show Session Complete overlay after a brief pause so user reads final message
       setTimeout(() => showSessionComplete(data.message), 1400);
+      // Kick off the cliffhanger (theme extraction + closing line) in parallel — never blocks the above
+      prepareCliffhanger(state.coachEntry, getTodayISO());
     }
   } catch (err) {
     thinking.remove();
@@ -1532,6 +1534,7 @@ function showSessionComplete(finalMessage) {
       </div>` : `<div class="session-upgrade-prompt">
         Enjoyed today's session? <a href="/referral.html" class="session-upgrade-link">Share ReflectAI with a friend</a> and earn a free month
       </div>`}
+      <div class="cliffhanger-section hidden" id="cliffhanger-section"></div>
     </div>`;
 
   // Set insight text safely (preserves line breaks)
@@ -1568,6 +1571,44 @@ function startNewEntry() {
   document.getElementById('prompts-section')?.classList.add('hidden');
   document.getElementById('journal-section')?.scrollIntoView({ behavior: 'smooth' });
   ta?.focus();
+}
+
+function wait(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+// Runs alongside showSessionComplete — never delays the main reflection.
+// Pro/trial: extracts a theme (5s timeout) for a personalised closing line and
+// next-day continuity prompt. Free: skips the AI call and uses the generic line.
+async function prepareCliffhanger(entryText, date) {
+  const isPro = state.accessLevel === 'pro' || state.accessLevel === 'trial';
+  const minDelay = wait(2200); // let the fade-in feel unhurried, not instant
+
+  let theme = null;
+  if (isPro && entryText) {
+    const extraction = api('POST', '/api/theme-extract', { entry: entryText })
+      .then(d => d?.theme || null)
+      .catch(() => null);
+    theme = await Promise.race([extraction, wait(5000).then(() => null)]);
+  }
+
+  await minDelay;
+  renderCliffhanger(theme);
+
+  try {
+    await api('PATCH', `/api/entries/${date}`, { tomorrowsTheme: theme });
+  } catch (err) { console.error('[prepareCliffhanger] could not save theme:', err.message); }
+}
+
+function renderCliffhanger(theme) {
+  const container = document.getElementById('cliffhanger-section');
+  if (!container) return; // overlay was already dismissed before this resolved
+
+  const body = theme
+    ? `You've reflected well today. Tomorrow, we'll explore <span class="cliffhanger-theme">${escapeHTML(theme)}</span> even further. Come back when you're ready to go deeper. 🌿`
+    : `You've reflected well today. Tomorrow, we'll build on what you've uncovered here. Come back when you're ready to go deeper. 🌿`;
+
+  container.innerHTML = `<span class="cliffhanger-leaf" aria-hidden="true">🌿</span><p class="cliffhanger-text">${body}</p>`;
+  container.classList.remove('hidden');
+  requestAnimationFrame(() => container.classList.add('visible'));
 }
 
 
@@ -2273,7 +2314,7 @@ function switchTab(name) {
   document.querySelectorAll(`#tab-${name} .reveal`).forEach(el => el.classList.add('visible'));
 
   if (name === 'home')     renderHomeTab();
-  if (name === 'journal')  { renderEntryStrip(); updateFreeEntryCounter(); }
+  if (name === 'journal')  { renderEntryStrip(); updateFreeEntryCounter(); renderJournalContinuityBanner(); }
   if (name === 'insights') initInsightsTab();
   if (name === 'goals')    renderGoals();
   if (name === 'profile')  renderProfileStats();
@@ -2282,6 +2323,62 @@ function switchTab(name) {
 function restoreTab() {
   const saved = localStorage.getItem(TAB_KEY) || 'home';
   switchTab(saved);
+}
+
+// Shows a "welcome back" prompt above the journal form when yesterday's
+// session left a tomorrowsTheme — only before today's entry has been written.
+function renderJournalContinuityBanner() {
+  const container = document.getElementById('journal-continuity-banner');
+  if (!container) return;
+
+  const today    = getTodayISO();
+  const hasToday = state.entries.some(e => e.date === today);
+  const priorEntry = !hasToday && state.entries
+    .filter(e => e.date < today && 'tomorrowsTheme' in e)
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+
+  if (!priorEntry) {
+    container.classList.add('hidden');
+    container.innerHTML = '';
+    return;
+  }
+
+  const theme = priorEntry.tomorrowsTheme;
+  container.innerHTML = theme
+    ? `<button type="button" class="continuity-dismiss" aria-label="Dismiss" onclick="dismissContinuityBanner('${priorEntry.date}')">&times;</button>
+       <p class="continuity-text">Welcome back 🌿<br>Yesterday you were exploring <span class="continuity-theme">${escapeHTML(theme)}</span>.<br>Would you like to continue from there, or start fresh today?</p>
+       <div class="continuity-actions">
+         <button type="button" class="btn btn-primary continuity-btn" onclick="continueFromYesterday('${priorEntry.date}')">Continue from yesterday</button>
+         <button type="button" class="btn btn-secondary continuity-btn" onclick="dismissContinuityBanner('${priorEntry.date}')">Start fresh</button>
+       </div>`
+    : `<button type="button" class="continuity-dismiss" aria-label="Dismiss" onclick="dismissContinuityBanner('${priorEntry.date}')">&times;</button>
+       <p class="continuity-text">Welcome back — ready to reflect today? 🌿</p>`;
+
+  container.classList.remove('hidden');
+}
+
+function continueFromYesterday(date) {
+  const entry = state.entries.find(e => e.date === date);
+  const theme = entry?.tomorrowsTheme;
+  const ta    = document.getElementById('journal-input');
+  if (ta && theme) {
+    ta.value = `Continuing from yesterday — I was thinking about ${theme}...`;
+    updateWordCount(ta);
+    autoResizeTextarea(ta);
+  }
+  dismissContinuityBanner(date);
+  ta?.focus();
+}
+
+async function dismissContinuityBanner(date) {
+  const container = document.getElementById('journal-continuity-banner');
+  if (container) { container.classList.add('hidden'); container.innerHTML = ''; }
+
+  const entry = state.entries.find(e => e.date === date);
+  if (entry) delete entry.tomorrowsTheme;
+
+  try { await api('PATCH', `/api/entries/${date}`, { clearTomorrowsTheme: true }); }
+  catch (err) { console.error('[dismissContinuityBanner]', err.message); }
 }
 
 
