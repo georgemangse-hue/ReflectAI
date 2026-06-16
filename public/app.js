@@ -277,7 +277,6 @@ function onAuthSuccess(token, user) {
   localStorage.setItem('reflectai_token', token);
   state.user = user;
   hideAuthOverlay();
-  initJournalTheme(user);
   applyUserUI(user);
   loadAppData();
   maybeShowNotifBanner();
@@ -466,7 +465,6 @@ async function initAuth() {
     const data = await api('GET', '/api/auth/me');
     if (!data) return;
     state.user = data.user; state.streak = data.streak;
-    initJournalTheme(data.user);
     hideAuthOverlay();
     applyUserUI(data.user);
     await loadAppData();
@@ -2839,7 +2837,6 @@ function updateProfileUI(user) {
   }
 
   document.getElementById('profile-upgrade-banner')?.classList.toggle('hidden', isPro);
-  renderThemePicker();
   loadReminderSettings(user);
 
   const billingEl   = document.getElementById('profile-billing-section');
@@ -2912,108 +2909,6 @@ async function saveProfileEdit() {
     }
     setTimeout(cancelEditProfile, 1800);
   } catch (e) { showToast('Could not save: ' + e.message); }
-}
-
-/* ================================================================
-   JOURNAL THEMES
-================================================================ */
-const JOURNAL_THEME_KEY = 'reflectai_journal_theme';
-
-const JOURNAL_THEMES = [
-  { id: 'forest',   name: 'Forest',      swatch: '#1D9E75', bg: '#f7faf7' },
-  { id: 'midnight', name: 'Midnight',    swatch: '#7F77DD', bg: '#1a1a2e' },
-  { id: 'sunrise',  name: 'Sunrise',     swatch: '#E8A020', bg: '#fff8f0' },
-  { id: 'ocean',    name: 'Ocean',       swatch: '#378ADD', bg: '#f0f7ff' },
-  { id: 'rose',     name: 'Rose',        swatch: '#E05555', bg: '#fff5f5' },
-  { id: 'mono',     name: 'Monochrome',  swatch: '#333333', bg: '#f5f5f5' },
-];
-
-let _pendingTheme = null; // theme id user has clicked but not yet saved
-
-function applyJournalTheme(themeId) {
-  const root = document.documentElement;
-  if (!themeId || themeId === 'forest') {
-    root.removeAttribute('data-journal-theme');
-  } else {
-    root.setAttribute('data-journal-theme', themeId);
-  }
-  localStorage.setItem(JOURNAL_THEME_KEY, themeId || 'forest');
-}
-
-function renderThemePicker() {
-  const wrap = document.getElementById('theme-swatches');
-  if (!wrap) return;
-  const isPro = state.accessLevel === 'pro' || state.accessLevel === 'trial';
-  const currentTheme = localStorage.getItem(JOURNAL_THEME_KEY) || 'forest';
-  _pendingTheme = currentTheme;
-  wrap.innerHTML = '';
-
-  JOURNAL_THEMES.forEach(t => {
-    const isLocked = !isPro && t.id !== 'forest';
-    const isActive = t.id === currentTheme;
-
-    const swatchWrap = document.createElement('div');
-    swatchWrap.className = 'theme-swatch-wrap';
-
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'theme-swatch' + (isActive ? ' active' : '') + (isLocked ? ' locked' : '');
-    btn.style.background = t.swatch;
-    btn.setAttribute('aria-label', t.name + (isLocked ? ' (Pro)' : ''));
-    btn.setAttribute('title', t.name);
-
-    if (isLocked) {
-      const lockEl = document.createElement('span');
-      lockEl.className = 'theme-swatch-lock';
-      lockEl.setAttribute('aria-hidden', 'true');
-      lockEl.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
-      btn.appendChild(lockEl);
-      btn.onclick = () => showToast('Upgrade to Pro to unlock all themes');
-    } else {
-      btn.onclick = () => previewTheme(t.id);
-    }
-
-    const label = document.createElement('span');
-    label.className = 'theme-swatch-label';
-    label.textContent = t.name;
-
-    swatchWrap.appendChild(btn);
-    swatchWrap.appendChild(label);
-    wrap.appendChild(swatchWrap);
-  });
-}
-
-function previewTheme(themeId) {
-  _pendingTheme = themeId;
-  applyJournalTheme(themeId);
-  // Update active ring
-  document.querySelectorAll('.theme-swatch').forEach((btn, i) => {
-    btn.classList.toggle('active', JOURNAL_THEMES[i].id === themeId);
-  });
-}
-
-async function saveJournalTheme() {
-  const themeId = _pendingTheme || localStorage.getItem(JOURNAL_THEME_KEY) || 'forest';
-  const btn     = document.getElementById('save-theme-btn');
-  const msgEl   = document.getElementById('theme-save-msg');
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
-  try {
-    await api('PATCH', '/api/user/theme', { journal_theme: themeId });
-    if (state.user) state.user.journal_theme = themeId;
-    applyJournalTheme(themeId); // ensure localStorage is up to date
-    if (msgEl) { msgEl.classList.remove('hidden'); setTimeout(() => msgEl.classList.add('hidden'), 3000); }
-    const name = JOURNAL_THEMES.find(t => t.id === themeId)?.name || themeId;
-    showToast(name + ' theme saved!');
-  } catch (e) { showToast('Could not save theme: ' + e.message); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = 'Save theme'; } }
-}
-
-function initJournalTheme(user) {
-  // Prefer server-saved theme; fall back to localStorage
-  const serverTheme = user?.journal_theme;
-  const localTheme  = localStorage.getItem(JOURNAL_THEME_KEY);
-  const themeId     = serverTheme || localTheme || 'forest';
-  applyJournalTheme(themeId);
 }
 
 /* ================================================================

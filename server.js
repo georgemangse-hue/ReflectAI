@@ -461,7 +461,6 @@ function userShape(u) {
     access_level:       accessLevel,  // 'pro' | 'trial' | 'free'
     reminder_enabled:   u.reminder_enabled   || false,
     reminder_time:      u.reminder_time      || '20:00',
-    journal_theme:      u.journal_theme      || 'forest',
   };
 }
 
@@ -2524,22 +2523,6 @@ Your check-in should note any specific evidence from the journal entries that re
         reminder_enabled: reminder_enabled === true,
         reminder_time:    time,
       });
-      const updated = readJSON(USERS_FILE).find(u => u.id === user.id);
-      return sendJSON(res, 200, { user: userShape(updated) });
-    }
-
-    if (method === 'PATCH' && url === '/api/user/theme') {
-      const user = requireAuth(req, res);
-      if (!user) return;
-      const { journal_theme } = await readBody(req);
-      const VALID_THEMES = new Set(['forest', 'midnight', 'sunrise', 'ocean', 'rose', 'mono']);
-      const theme = VALID_THEMES.has(journal_theme) ? journal_theme : 'forest';
-      // Pro gate — free users can only use forest
-      const accessLevel = getUserAccessLevel(user);
-      if (theme !== 'forest' && accessLevel === 'free') {
-        return sendJSON(res, 403, { error: 'Journal themes require a Pro plan.' });
-      }
-      updateUser(user.id, { journal_theme: theme });
       const updated = readJSON(USERS_FILE).find(u => u.id === user.id);
       return sendJSON(res, 200, { user: userShape(updated) });
     }
