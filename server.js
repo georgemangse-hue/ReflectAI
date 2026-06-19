@@ -31,9 +31,13 @@ loadEnv();
 ================================================================ */
 const PORT                = process.env.PORT || 3000;
 const API_KEY             = process.env.ANTHROPIC_API_KEY;
-const PAYSTACK_PUBLIC_KEY    = process.env.PAYSTACK_PUBLIC_KEY    || '';
-const PAYSTACK_SECRET_KEY    = process.env.PAYSTACK_SECRET_KEY    || '';
-const PAYSTACK_PLAN_CODE     = process.env.PAYSTACK_PLAN_CODE     || ''; // e.g. PLN_xxxxxxxx
+const PAYSTACK_PUBLIC_KEY      = process.env.PAYSTACK_PUBLIC_KEY      || '';
+const PAYSTACK_SECRET_KEY      = process.env.PAYSTACK_SECRET_KEY      || '';
+const PAYSTACK_PLAN_CODE_LIVE  = process.env.PAYSTACK_PLAN_CODE       || ''; // e.g. PLN_xxxxxxxx (live)
+const PAYSTACK_PLAN_CODE_TEST  = process.env.PAYSTACK_PLAN_CODE_TEST  || ''; // e.g. PLN_xxxxxxxx (test)
+const PAYSTACK_PLAN_CODE       = PAYSTACK_SECRET_KEY.startsWith('sk_test_')
+  ? PAYSTACK_PLAN_CODE_TEST
+  : PAYSTACK_PLAN_CODE_LIVE;
 const STRIPE_SECRET_KEY      = process.env.STRIPE_SECRET_KEY      || '';
 const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY || '';
 const STRIPE_PRICE_ID        = process.env.STRIPE_PRICE_ID        || ''; // e.g. price_xxxxxxxx
@@ -2560,7 +2564,10 @@ server.listen(PORT, '0.0.0.0', () => {
   if (!API_KEY)                  console.warn('  ⚠  ANTHROPIC_API_KEY not set — AI features disabled.\n');
   if (!PAYSTACK_SECRET_KEY)      console.warn('  ℹ  PAYSTACK_SECRET_KEY not set — Paystack runs in test mode.\n');
   if (!PAYSTACK_PUBLIC_KEY)      console.warn('  ⚠  PAYSTACK_PUBLIC_KEY not set — frontend will use test mode even if secret key is live!\n');
-  if (!PAYSTACK_PLAN_CODE)       console.warn('  ℹ  PAYSTACK_PLAN_CODE not set — create a monthly plan in Paystack dashboard.\n');
+  if (PAYSTACK_SECRET_KEY.startsWith('sk_test_') && !PAYSTACK_PLAN_CODE_TEST)
+    console.warn('  ℹ  PAYSTACK_PLAN_CODE_TEST not set — Paystack subscriptions will fail in test mode.\n');
+  if (!PAYSTACK_SECRET_KEY.startsWith('sk_test_') && !PAYSTACK_PLAN_CODE_LIVE)
+    console.warn('  ℹ  PAYSTACK_PLAN_CODE not set — create a monthly plan in Paystack dashboard.\n');
 
   // Detect live/test key mismatch — the most common cause of "Transaction reference not found"
   const skEnv = PAYSTACK_SECRET_KEY.startsWith('sk_live_') ? 'live'
